@@ -29,11 +29,16 @@
 
 -define(R_DT_STRING,          ?DT_STRING:8/integer-little).
 
--define(XT_LANG,              4).
+-define(XT_STR,               3).
 -define(XT_VECTOR,            16).
+-define(XT_CLOS,              18).
+-define(XT_SYMNAME,           19).
+-define(XT_LIST_TAG,          21).
 -define(XT_VECTOR_EXP,        26).
 -define(XT_ARRAY_DOUBLE,      33).
 -define(XT_ARRAY_STR,         34).
+
+-define(XT_HAS_ATTR,          128).
 
 
 %%%_* External API -------------------------------------------------------------
@@ -102,28 +107,43 @@ receive_item(Sock, ?DT_SEXP) ->
   << SexpType:8/integer-little
    , SexpLength:24/integer-little
   >> = Header,
-  Item = {sexp, receive_sexp(Sock, SexpType, SexpLength)},
+  Item = receive_sexp(Sock, SexpType, SexpLength),
   {Item, SexpLength + 4}.
 
-receive_sexp(Sock, ?XT_VECTOR,       Length) ->
+receive_sexp(Sock, Type,             Length) when Type > ?XT_HAS_ATTR ->
+  %% SEXP has attributes, so we need to read off the attribute SEXP
+  %% before we get to this expression proper
+  {AttrSexp, AttrSexpLength} = receive_item(Sock, ?DT_SEXP),
+  Sexp                       = receive_sexp(Sock,
+                                            Type - ?XT_HAS_ATTR,
+                                            Length - AttrSexpLength),
+  {attr_sexp, [ {attributes, AttrSexp}, Sexp ]};
+receive_sexp(Sock, ?XT_STR,          Length)                          ->
+  Strings = receive_string_array(Sock, Length),
+  {string, hd(Strings)};
+receive_sexp(Sock, ?XT_VECTOR,       Length)                          ->
   Vector = receive_vector(Sock, Length, []),
   {vector, Vector};
-receive_sexp(Sock, ?XT_VECTOR_EXP,   Length) ->
+receive_sexp(Sock, ?XT_SYMNAME,      Length)                          ->
+  receive_sexp(Sock, ?XT_STR, Length);
+receive_sexp(Sock, ?XT_LIST_TAG,     Length)                          ->
+  TagList = receive_tagged_list(Sock, Length, []),
+  {tagged_list, TagList};
+receive_sexp(Sock, ?XT_VECTOR_EXP,   Length)                          ->
   receive_sexp(Sock, ?XT_VECTOR, Length);
-receive_sexp(Sock, ?XT_ARRAY_DOUBLE, Length) ->
+receive_sexp(Sock, ?XT_CLOS,         Length)                          ->
+  Closure = receive_closure(Sock, Length),
+  {closure, Closure};
+receive_sexp(Sock, ?XT_ARRAY_DOUBLE, Length)                          ->
   Array = receive_double_array(Sock, Length, []),
   {{array, double}, Array};
-receive_sexp(Sock, ?XT_ARRAY_STR,    Length) ->
+receive_sexp(Sock, ?XT_ARRAY_STR,    Length)                          ->
   Array = receive_string_array(Sock, Length),
   {{array, string}, Array}.
 
-receive_vector(_Sock, 0,      Acc) ->
-  lists:reverse(Acc);
-receive_vector( Sock, Length, Acc) ->
-  {Item, UsedLength} = receive_item(Sock, ?DT_SEXP),
-  NewAcc = [Item|Acc],
-  RemainingLength = Length - UsedLength,
-  receive_vector(Sock, RemainingLength, NewAcc).
+receive_closure(Sock, Length) ->
+  {ok, Closure} = gen_tcp:recv(Sock, Length),
+  Closure.
 
 receive_double_array(_Sock, 0,      Acc) ->
   lists:reverse(Acc);
@@ -143,3 +163,23 @@ receive_string_array(Sock, Length) ->
   %% Strip off '\01'-padding, and split on null terminators
   String     = string:strip(binary_to_list(Data), right, 1),
   string:tokens(String, [0]).
+
+receive_tagged_list(_Sock, 0,      Acc) ->
+  lists:reverse(Acc);
+receive_tagged_list( Sock, Length, Acc) ->
+  {Value, ValueLength} = receive_item(Sock, ?DT_SEXP),
+  {Key,   KeyLength}   = receive_item(Sock, ?DT_SEXP),
+  Item                 = [ {key,   Key}
+                         , {value, Value}
+                         ],
+  NewAcc               = [Item|Acc],
+  RemainingLength      = Length - KeyLength - ValueLength,
+  receive_tagged_list(Sock, RemainingLength, NewAcc).
+
+receive_vector(_Sock, 0,      Acc) ->
+  lists:reverse(Acc);
+receive_vector( Sock, Length, Acc) ->
+  {Item, UsedLength} = receive_item(Sock, ?DT_SEXP),
+  NewAcc = [Item|Acc],
+  RemainingLength = Length - UsedLength,
+  receive_vector(Sock, RemainingLength, NewAcc).
