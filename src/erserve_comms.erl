@@ -30,6 +30,7 @@
 -define(R_DT_STRING,          ?DT_STRING:8/integer-little).
 
 -define(XT_LANG,              4).
+-define(XT_VECTOR,            16).
 -define(XT_VECTOR_EXP,        26).
 -define(XT_ARRAY_DOUBLE,      33).
 -define(XT_ARRAY_STR,         34).
@@ -91,17 +92,24 @@ receive_data( Sock, Length, Acc) ->
   << Type:8/integer-little
    , ItemLength:24/integer-little
   >> = Header,
-  NewAcc = [receive_item(Sock, Type, ItemLength)|Acc],
+  {Item, _L} = receive_item(Sock, Type),
+  NewAcc = [Item|Acc],
   RemainingLength = Length - ItemLength - 4,
   receive_data(Sock, RemainingLength, NewAcc).
 
-receive_item(Sock, ?DT_SEXP, _Length) ->
+receive_item(Sock, ?DT_SEXP) ->
   {ok, Header} = gen_tcp:recv(Sock, 4),
   << SexpType:8/integer-little
    , SexpLength:24/integer-little
   >> = Header,
-  {sexp, receive_sexp(Sock, SexpType, SexpLength)}.
+  Item = {sexp, receive_sexp(Sock, SexpType, SexpLength)},
+  {Item, SexpLength + 4}.
 
+receive_sexp(Sock, ?XT_VECTOR,       Length) ->
+  Vector = receive_vector(Sock, Length, []),
+  {vector, Vector};
+receive_sexp(Sock, ?XT_VECTOR_EXP,   Length) ->
+  receive_sexp(Sock, ?XT_VECTOR, Length);
 receive_sexp(Sock, ?XT_ARRAY_DOUBLE, Length) ->
   Array = receive_double_array(Sock, Length, []),
   {{array, double}, Array};
@@ -109,8 +117,16 @@ receive_sexp(Sock, ?XT_ARRAY_STR,    Length) ->
   Array = receive_string_array(Sock, Length),
   {{array, string}, Array}.
 
+receive_vector(_Sock, 0,      Acc) ->
+  lists:reverse(Acc);
+receive_vector( Sock, Length, Acc) ->
+  {Item, UsedLength} = receive_item(Sock, ?DT_SEXP),
+  NewAcc = [Item|Acc],
+  RemainingLength = Length - UsedLength,
+  receive_vector(Sock, RemainingLength, NewAcc).
+
 receive_double_array(_Sock, 0,      Acc) ->
-  Acc;
+  lists:reverse(Acc);
 receive_double_array( Sock, Length, Acc) ->
   Double          = receive_double(Sock),
   NewAcc          = [Double|Acc],
