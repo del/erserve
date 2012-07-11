@@ -1,2 +1,4 @@
 *.beam
 *~
+ebin/erserve.app
+Rserve/

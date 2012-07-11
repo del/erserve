@@ -1,0 +1,11 @@
+{ application
+, erserve
+, [ {description, "Erlang/Rserve communication application"}
+  , {vsn, "1.0"}
+  , {registered, []}
+  , {applications, [ kernel
+                   , stdlib
+                   ]}
+  , {mod, { erserve, [] }}
+  , {env, []}
+ ]}.
