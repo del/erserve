@@ -63,8 +63,8 @@ send_expression(Sock, Expr) ->
 receive_reply(Sock) ->
   {ok, AckCode} = gen_tcp:recv(Sock, 4),
   case AckCode of
-    <<?R_RESP_OK>>    -> receive_reply_1(Sock);
-    <<?R_RESP_ERROR>> -> receive_reply_error(Sock)
+    <<?R_RESP_OK>> -> receive_reply_1(Sock);
+    _              -> receive_reply_error(AckCode, Sock)
   end.
 
 receive_reply_1(Sock) ->
@@ -76,9 +76,9 @@ receive_reply_1(Sock) ->
   Len  = Len0 + (Len1 bsl 31),
   {ok, receive_data(Sock, Len)}.
 
-receive_reply_error(Sock) ->
-  gen_tcp:recv(Sock, 0),
-  error.
+receive_reply_error(AckCode, Sock) ->
+  {ok, Rest} = gen_tcp:recv(Sock, 0),
+  {error, AckCode, Rest}.
 
 %%%_* Data receiving functions -------------------------------------------------
 receive_data(Sock, Length) ->
