@@ -1,4 +1,4 @@
--module(rserve_worker).
+-module(erserve_worker).
 
 -behaviour(gen_server).
 
@@ -37,7 +37,7 @@ init({Host, Port}) ->
                                            , {packet, raw}
                                            ]),
   try
-    ok = rserve_comms:receive_connection_ack(Sock)
+    ok = erserve_comms:receive_connection_ack(Sock)
   catch _:_ ->
       gen_tcp:close(Sock),
       exit(invalid_ack)
@@ -45,8 +45,9 @@ init({Host, Port}) ->
   {ok, Sock}.
 
 handle_call({eval, Expr}, _From, Sock) ->
-  Response = rserve_comms:eval(Sock, Expr),
+  Response = erserve_comms:eval(Sock, Expr),
   {reply, Response, Sock}.
+
 
 %%%_* unused gen_server callbacks ----------------------------------------------
 code_change(_OldVsn, Sock, _Extra) ->
@@ -60,8 +61,3 @@ handle_info(_Msg, Sock) ->
 
 terminate(_Reason, _Sock) ->
   ok.
-
-
-%%% Local variables:
-%%% erlang-indent-level: 2
-%%% End:

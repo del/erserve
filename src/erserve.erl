@@ -1,4 +1,4 @@
--module(rserve).
+-module(erserve).
 
 -behaviour(application).
 

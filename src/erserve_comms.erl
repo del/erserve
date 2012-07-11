@@ -1,4 +1,4 @@
--module(rserve_comms).
+-module(erserve_comms).
 
 %%%_* Exports ------------------------------------------------------------------
 -export([ eval/2
@@ -127,8 +127,3 @@ receive_string_array(Sock, Length) ->
   %% Strip off '\01'-padding, and split on null terminators
   String     = string:strip(binary_to_list(Data), right, 1),
   string:tokens(String, [0]).
-
-
-%%% Local variables:
-%%% erlang-indent-level: 2
-%%% End:
