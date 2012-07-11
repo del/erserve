@@ -8,9 +8,9 @@
 %% External API
 -export([ close/1
         , eval/2
-        , open/0
         , open/1
         , open/2
+        , open/3
         ]).
 
 %% application callbacks
@@ -25,29 +25,27 @@
 
 
 %%%_* External API -------------------------------------------------------------
--spec close(pid()) -> ok | {error, term()}.
-close(Pid) ->
-  supervisor:delete_child(erserve_sup, Pid).
+-spec close(string()) -> ok | {error, term()}.
+close(Name) ->
+  Pid = gen_server:call(Name, get_pid),
+  supervisor:terminate_child(erserve_sup, Pid).
 
--spec eval(pid(), string()) -> {ok, term()} | {error, term()}.
-eval(Pid, Expr) ->
-  gen_server:call(Pid, {eval, Expr}).
+-spec eval(string(), string()) -> {ok, term()} | {error, term()}.
+eval(Name, Expr) ->
+  gen_server:call(Name, {eval, Expr}).
 
--spec open() -> pid().
-open() ->
-  open(?default_host, ?default_port).
+-spec open(string()) -> string().
+open(Name) ->
+  open(Name, ?default_host).
 
--spec open(string()) -> pid().
-open(Host) ->
-  open(Host, ?default_port).
+-spec open(string(), string()) -> string().
+open(Name, Host) ->
+  open(Name, Host, ?default_port).
 
--spec open(string(), pos_integer()) -> pid().
-open(Host, Port) ->
-  Args = [ {host, Host}
-         , {port, Port}
-         ],
-  {ok, Pid} = supervisor:start_child(erserve_sup, Args),
-  Pid.
+-spec open(string(), string(), pos_integer()) -> string().
+open(Name, Host, Port) ->
+  {ok, _Pid} = supervisor:start_child(erserve_sup, [Name, Host, Port]),
+  ok.
 
 
 %%%_* application callbacks ----------------------------------------------------

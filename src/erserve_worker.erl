@@ -6,12 +6,14 @@
 %%%_* Exports ------------------------------------------------------------------
 
 %% External API
--export([ start_link/1
+-export([ start_link/3
         ]).
 
 %% gen_server callbacks
--export([ handle_call/3
+-export([ code_change/3
+        , handle_call/3
         , handle_cast/2
+        , handle_info/2
         , init/1
         , terminate/2
         ]).
@@ -23,11 +25,10 @@
 
 
 %%%_* External API -------------------------------------------------------------
--spec start_link([ term() ]) -> {ok, pid()} | {error, term()}.
-start_link(Args) ->
-  {host, Host} = lists:keyfind(host, 1, Args),
-  {port, Port} = lists:keyfind(port, 1, Args),
-  gen_server:start_link({local, ?MODULE}, ?MODULE, {Host, Port}, []).
+-spec start_link(string(), string(), pos_integer()) ->
+                    {ok, pid()} | {error, term()}.
+start_link(Name, Host, Port) ->
+  gen_server:start_link({local, Name}, ?MODULE, {Host, Port}, []).
 
 
 %%%_* gen_server callbacks -----------------------------------------------------
@@ -46,7 +47,9 @@ init({Host, Port}) ->
 
 handle_call({eval, Expr}, _From, Sock) ->
   Response = erserve_comms:eval(Sock, Expr),
-  {reply, Response, Sock}.
+  {reply, Response, Sock};
+handle_call(get_pid, _From, Sock)      ->
+  {reply, self(), Sock}.
 
 
 %%%_* unused gen_server callbacks ----------------------------------------------
