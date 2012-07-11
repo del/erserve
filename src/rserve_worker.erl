@@ -2,18 +2,14 @@
 
 -behaviour(gen_server).
 
-%%%=============================================================================
-%%% Exports
-%%%=============================================================================
-%%%-----------------------------------------------------------------------------
-%%% Interface
-%%%-----------------------------------------------------------------------------
--export([ start_link/2
+
+%%%_* Exports ------------------------------------------------------------------
+
+%% External API
+-export([ start_link/1
         ]).
 
-%%%-----------------------------------------------------------------------------
-%%% gen_server callbacks
-%%%-----------------------------------------------------------------------------
+%% gen_server callbacks
 -export([ handle_call/3
         , handle_cast/2
         , init/1
@@ -21,15 +17,20 @@
         ]).
 
 
-%%%=============================================================================
-%%% External API
-%%%=============================================================================
-start_link(Host, Port) ->
-  gen_server:start_link(?MODULE, {Host, Port}, []).
+%%%_* Local definitions --------------------------------------------------------
+-define(default_host, "localhost").
+-define(default_port, 6311).
 
-%%%=============================================================================
-%%% Internal functions
-%%%=============================================================================
+
+%%%_* External API -------------------------------------------------------------
+-spec start_link([ term() ]) -> {ok, pid()} | {error, term()}.
+start_link(Args) ->
+  {host, Host} = lists:keyfind(host, 1, Args),
+  {port, Port} = lists:keyfind(port, 1, Args),
+  gen_server:start_link({local, ?MODULE}, ?MODULE, {Host, Port}, []).
+
+
+%%%_* gen_server callbacks -----------------------------------------------------
 init({Host, Port}) ->
   {ok, Sock} = gen_tcp:connect(Host, Port, [ {active, false}
                                            , binary
@@ -43,12 +44,18 @@ init({Host, Port}) ->
   end,
   {ok, Sock}.
 
-handle_call(test, _From, Sock) ->
-  {ok, Response} = rserve_comms:eval_R(Sock, "R.version"),
-  io:format("Received response~n~p~n", [Response]),
+handle_call({eval, Expr}, _From, Sock) ->
+  Response = rserve_comms:eval(Sock, Expr),
   {reply, Response, Sock}.
 
+%%%_* unused gen_server callbacks ----------------------------------------------
+code_change(_OldVsn, Sock, _Extra) ->
+  {ok, Sock}.
+
 handle_cast(_Msg, Sock) ->
+  {noreply, Sock}.
+
+handle_info(_Msg, Sock) ->
   {noreply, Sock}.
 
 terminate(_Reason, _Sock) ->
