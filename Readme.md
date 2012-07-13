@@ -49,9 +49,11 @@ types.
 7. Start the erserve application and connect to your Rserve
 
        application:start(erserve).
+       
        erserve:open(my_conn, "localhost", 6311).
 
 8. Send a message to R to verify the connection works:
 
        erserve:eval(my_conn, "c(1, 2, 3)").
+       
        % {ok,[{{array,double},[1.0,2.0,3.0]}]}
