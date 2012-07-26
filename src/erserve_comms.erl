@@ -40,6 +40,23 @@
 
 -define(XT_HAS_ATTR,          128).
 
+-define(ERR_AUTH_FAILED,      65).
+-define(ERR_CONN_BROKEN,      66).
+-define(ERR_INV_CMD,          67).
+-define(ERR_INV_PAR,          68).
+-define(ERR_R_ERROR,          69).
+-define(ERR_IO_ERROR,         70).
+-define(ERR_NOT_OPEN,         71).
+-define(ERR_ACCESS_DENIED,    72).
+-define(ERR_UNSUPPORTED_CMD,  73).
+-define(ERR_UNKNOWN_CMD,      74).
+-define(ERR_DATA_OVERFLOW,    75).
+-define(ERR_OBJECT_TOO_BIG,   76).
+-define(ERR_OUT_OF_MEM,       77).
+-define(ERR_CTRL_CLOSED,      78).
+-define(ERR_SESSION_BUSY,     80).
+-define(ERR_DETACH_FAILED,    81).
+
 
 %%%_* External API -------------------------------------------------------------
 receive_connection_ack(Sock) ->
@@ -83,8 +100,10 @@ receive_reply_1(Sock) ->
   {ok, receive_data(Sock, Len)}.
 
 receive_reply_error(AckCode, Sock) ->
-  {ok, Rest} = gen_tcp:recv(Sock, 0),
-  {error, AckCode, Rest}.
+  <<2,0,1,ErrCode>> = AckCode,
+  Error             = error_from_code(ErrCode),
+  {ok, Rest}        = gen_tcp:recv(Sock, 0),
+  {error, Error, Rest}.
 
 %%%_* Data receiving functions -------------------------------------------------
 receive_data(Sock, Length) ->
@@ -183,3 +202,40 @@ receive_vector( Sock, Length, Acc) ->
   NewAcc = [Item|Acc],
   RemainingLength = Length - UsedLength,
   receive_vector(Sock, RemainingLength, NewAcc).
+
+
+%%%_* Error handling -----------------------------------------------------------
+error_from_code(?ERR_AUTH_FAILED)     ->
+  auth_failed;
+error_from_code(?ERR_CONN_BROKEN)     ->
+  connection_broken;
+error_from_code(?ERR_INV_CMD)         ->
+  invalid_command;
+error_from_code(?ERR_INV_PAR)         ->
+  invalid_parameters;
+error_from_code(?ERR_R_ERROR)         ->
+  r_error_occurred;
+error_from_code(?ERR_IO_ERROR)        ->
+  io_error;
+error_from_code(?ERR_NOT_OPEN)        ->
+  file_not_open;
+error_from_code(?ERR_ACCESS_DENIED)   ->
+  access_denied;
+error_from_code(?ERR_UNSUPPORTED_CMD) ->
+  unsupported_command;
+error_from_code(?ERR_UNKNOWN_CMD)     ->
+  unknown_command;
+error_from_code(?ERR_DATA_OVERFLOW)   ->
+  data_overflow;
+error_from_code(?ERR_OBJECT_TOO_BIG)  ->
+  object_too_big;
+error_from_code(?ERR_OUT_OF_MEM)      ->
+  out_of_memory;
+error_from_code(?ERR_CTRL_CLOSED)     ->
+  control_pipe_closed;
+error_from_code(?ERR_SESSION_BUSY)    ->
+  session_busy;
+error_from_code(?ERR_DETACH_FAILED)   ->
+  unable_to_detach_session;
+error_from_code(Other)                ->
+  {unknown_error, Other}.
