@@ -45,10 +45,16 @@ init({Host, Port}) ->
   end,
   {ok, Sock}.
 
-handle_call({eval, Expr}, _From, Sock) ->
+handle_call({eval, Expr},                _From, Sock) ->
   Response = erserve_comms:eval(Sock, Expr),
   {reply, Response, Sock};
-handle_call(get_pid, _From, Sock)      ->
+handle_call({eval_void, Expr},           _From, Sock) ->
+  Response = erserve_comms:eval_void(Sock, Expr),
+  {reply, Response, Sock};
+handle_call({set_variable, Name, Value}, _From, Sock) ->
+  Response = erserve_comms:set_variable(Sock, Name, Value),
+  {reply, Response, Sock};
+handle_call(get_pid,                     _From, Sock) ->
   {reply, self(), Sock}.
 
 

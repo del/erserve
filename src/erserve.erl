@@ -8,9 +8,11 @@
 %% External API
 -export([ close/1
         , eval/2
+        , eval_void/2
         , open/1
         , open/2
         , open/3
+        , set_variable/3
         ]).
 
 %% application callbacks
@@ -24,15 +26,11 @@
 -define(default_port, 6311).
 
 
-%%%_* External API -------------------------------------------------------------
+%%%_* Connection handling ------------------------------------------------------
 -spec close(term()) -> ok | {error, term()}.
 close(Name) ->
   Pid = gen_server:call(Name, get_pid),
   supervisor:terminate_child(erserve_sup, Pid).
-
--spec eval(term(), string()) -> {ok, term()} | {error, term()}.
-eval(Name, Expr) ->
-  gen_server:call(Name, {eval, Expr}).
 
 -spec open(term()) -> string().
 open(Name) ->
@@ -46,6 +44,21 @@ open(Name, Host) ->
 open(Name, Host, Port) ->
   {ok, _Pid} = supervisor:start_child(erserve_sup, [Name, Host, Port]),
   ok.
+
+
+%%%_* Commands -----------------------------------------------------------------
+-spec eval(term(), string()) -> {ok, term()} | {error, term(), binary()}.
+eval(Name, Expr) ->
+  gen_server:call(Name, {eval, Expr}).
+
+-spec eval_void(term(), string()) -> ok | {error, term(), binary()}.
+eval_void(Name, Expr) ->
+  gen_server:call(Name, {eval_void, Expr}).
+
+-spec set_variable(term(), string() | atom(), term()) ->
+                      {ok, term()} | {error, term(), binary()}.
+set_variable(Name, VarName, Value) ->
+  gen_server:call(Name, {set_variable, VarName, Value}).
 
 
 %%%_* application callbacks ----------------------------------------------------
