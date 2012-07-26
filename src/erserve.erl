@@ -12,13 +12,22 @@
         , open/1
         , open/2
         , open/3
-        , set_variable/3
+        , set_variable/4
         ]).
 
 %% application callbacks
 -export([ start/2
         , stop/1
         ]).
+
+
+%%%_* Types --------------------------------------------------------------------
+-type type() :: int
+              | double
+              | string
+              | array_int
+              | array_double
+              | array_string.
 
 
 %%%_* Local definitions --------------------------------------------------------
@@ -55,10 +64,10 @@ eval(Name, Expr) ->
 eval_void(Name, Expr) ->
   gen_server:call(Name, {eval_void, Expr}).
 
--spec set_variable(term(), string() | atom(), term()) ->
+-spec set_variable(term(), string() | atom(), type(), term()) ->
                       {ok, term()} | {error, term(), binary()}.
-set_variable(Name, VarName, Value) ->
-  gen_server:call(Name, {set_variable, VarName, Value}).
+set_variable(Name, VarName, Type, Value) ->
+  gen_server:call(Name, {set_variable, VarName, Type, Value}).
 
 
 %%%_* application callbacks ----------------------------------------------------

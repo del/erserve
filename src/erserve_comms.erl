@@ -4,69 +4,12 @@
 -export([ eval/2
         , eval_void/2
         , receive_connection_ack/1
-        , set_variable/3
+        , set_variable/4
         ]).
 
 
-%%%_* Local definitions --------------------------------------------------------
--define(HEADER_LENGTH,        16).
--define(DT_HEADER_LENGTH,     4).
-
--define(R_CMD_VOID_EVAL,      2).
--define(R_CMD_EVAL,           3).
--define(R_CMD_SET_SEXP,       32).
--define(R_MSG_LENGTH(Length), (Length+5):32/integer-little).
--define(R_EXP_LENGTH(Length), (Length+1):24/integer-little).
--define(R_OFFSET,             0:32/integer-little).
--define(R_LENGTH2,            0:32/integer-little).
--define(R_EXP(Exp),           (list_to_binary(Exp))/binary).
--define(R_TERMINATE,          0).
-
--define(R_RESP_OK,            16#10001:32/integer-little).
--define(R_RESP_ERROR,         16#10002:32/integer-little).
-
--define(DT_INT,               1).
--define(DT_CHAR,              2).
--define(DT_DOUBLE,            3).
--define(DT_STRING,            4).
--define(DT_BYTESTREAM,        5).
--define(DT_SEXP,              10).
--define(DT_ARRAY,             11).
--define(DT_LARGE,             64).
-
--define(XT_INT,               1).
--define(XT_DOUBLE,            2).
--define(XT_STR,               3).
--define(XT_LANG,              4).
--define(XT_VECTOR,            16).
--define(XT_LIST,              17).
--define(XT_CLOS,              18).
--define(XT_SYMNAME,           19).
--define(XT_LIST_TAG,          21).
--define(XT_LANG_NOTAG,        22).
--define(XT_VECTOR_EXP,        26).
--define(XT_ARRAY_INT,         32).
--define(XT_ARRAY_DOUBLE,      33).
--define(XT_ARRAY_STR,         34).
-
--define(XT_HAS_ATTR,          128).
-
--define(ERR_AUTH_FAILED,      65).
--define(ERR_CONN_BROKEN,      66).
--define(ERR_INV_CMD,          67).
--define(ERR_INV_PAR,          68).
--define(ERR_R_ERROR,          69).
--define(ERR_IO_ERROR,         70).
--define(ERR_NOT_OPEN,         71).
--define(ERR_ACCESS_DENIED,    72).
--define(ERR_UNSUPPORTED_CMD,  73).
--define(ERR_UNKNOWN_CMD,      74).
--define(ERR_DATA_OVERFLOW,    75).
--define(ERR_OBJECT_TOO_BIG,   76).
--define(ERR_OUT_OF_MEM,       77).
--define(ERR_CTRL_CLOSED,      78).
--define(ERR_SESSION_BUSY,     80).
--define(ERR_DETACH_FAILED,    81).
+%%%_* Includes -----------------------------------------------------------------
+-include_lib("src/erserve.hrl").
 
 
 %%%_* External API -------------------------------------------------------------
@@ -86,27 +29,39 @@ eval_void(Sock, Expr) ->
     {error, AckCode, Rest} -> {error, AckCode, Rest}
   end.
 
-set_variable(Sock, Name, Value) when is_atom(Name) ->
-  set_variable(Sock, atom_to_list(Name), Value);
-set_variable(Sock, Name, Value)                    ->
-  ok = send_sexp(Sock, Name, Value),
+set_variable(Sock, Name, Type,   Value) when is_atom(Name) ->
+  set_variable(Sock, atom_to_list(Name), Type, Value);
+set_variable(Sock, Name, int,    Value)                    ->
+  set_variable(Sock, Name, array_int, [Value]);
+set_variable(Sock, Name, double, Value)                    ->
+  set_variable(Sock, Name, array_double, [Value]);
+set_variable(Sock, Name, Type, Value)                      ->
+  ok = send_set_variable(Sock, Name, Type, Value),
   receive_reply(Sock).
 
 
 %%%_* Internal functions -------------------------------------------------------
 send_eval(Sock, Expr) ->
-  send_expression(Sock, Expr, ?R_CMD_EVAL).
+  Message = message(eval, Expr),
+  gen_tcp:send(Sock, Message).
 
 send_eval_void(Sock, Expr) ->
-  send_expression(Sock, Expr, ?R_CMD_VOID_EVAL).
+  Message = message(eval_void, Expr),
+  gen_tcp:send(Sock, Message).
+
+send_set_variable(Sock, Name, Type, Value) ->
+  Message = message({set_variable, Type}, {Name, Value}),
+  io:format("Sending~n"),
+  binpp:pprint(iolist_to_binary(Message)),
+  gen_tcp:send(Sock, Message).
 
 
 %%%_* Data receiving functions -------------------------------------------------
 receive_reply(Sock) ->
   {ok, AckCode} = gen_tcp:recv(Sock, 4),
   case AckCode of
-    <<?R_RESP_OK>> -> receive_reply_1(Sock);
-    _              -> receive_reply_error(AckCode, Sock)
+    <<?resp_ok>> -> receive_reply_1(Sock);
+    _            -> receive_reply_error(AckCode, Sock)
   end.
 
 receive_reply_1(Sock) ->
@@ -142,7 +97,7 @@ receive_data( Sock, Length, Acc) ->
   RemainingLength = Length - ItemLength - 4,
   receive_data(Sock, RemainingLength, NewAcc).
 
-receive_item(Sock, ?DT_SEXP) ->
+receive_item(Sock, ?dt_sexp) ->
   {ok, Header} = gen_tcp:recv(Sock, 4),
   << SexpType:8/integer-little
    , SexpLength:24/integer-little
@@ -150,39 +105,39 @@ receive_item(Sock, ?DT_SEXP) ->
   Item = receive_sexp(Sock, SexpType, SexpLength),
   {Item, SexpLength + 4}.
 
-receive_sexp(Sock, Type,             Length) when Type > ?XT_HAS_ATTR ->
+receive_sexp(Sock, Type,             Length) when Type > ?xt_has_attr ->
   %% SEXP has attributes, so we need to read off the attribute SEXP
   %% before we get to this expression proper
-  {AttrSexp, AttrSexpLength} = receive_item(Sock, ?DT_SEXP),
+  {AttrSexp, AttrSexpLength} = receive_item(Sock, ?dt_sexp),
   Sexp                       = receive_sexp(Sock,
-                                            Type - ?XT_HAS_ATTR,
+                                            Type - ?xt_has_attr,
                                             Length - AttrSexpLength),
   {AttrSexp, Sexp};
-receive_sexp(Sock, ?XT_STR,          Length)                          ->
+receive_sexp(Sock, ?xt_str,          Length)                          ->
   Strings = receive_string_array(Sock, Length),
   hd(Strings);
-receive_sexp(Sock, ?XT_VECTOR,       Length)                          ->
+receive_sexp(Sock, ?xt_vector,       Length)                          ->
   Vector = receive_vector(Sock, Length, []),
   Vector;
-receive_sexp(Sock, ?XT_SYMNAME,      Length)                          ->
-  receive_sexp(Sock, ?XT_STR, Length);
-receive_sexp(Sock, ?XT_LIST_TAG,     Length)                          ->
+receive_sexp(Sock, ?xt_symname,      Length)                          ->
+  receive_sexp(Sock, ?xt_str, Length);
+receive_sexp(Sock, ?xt_list_tag,     Length)                          ->
   TagList = receive_tagged_list(Sock, Length, []),
   TagList;
-receive_sexp(Sock, ?XT_LANG_NOTAG,   Length)                          ->
-  receive_sexp(Sock, ?XT_VECTOR, Length);
-receive_sexp(Sock, ?XT_VECTOR_EXP,   Length)                          ->
-  receive_sexp(Sock, ?XT_VECTOR, Length);
-receive_sexp(Sock, ?XT_CLOS,         Length)                          ->
+receive_sexp(Sock, ?xt_lang_notag,   Length)                          ->
+  receive_sexp(Sock, ?xt_vector, Length);
+receive_sexp(Sock, ?xt_vector_exp,   Length)                          ->
+  receive_sexp(Sock, ?xt_vector, Length);
+receive_sexp(Sock, ?xt_clos,         Length)                          ->
   Closure = receive_closure(Sock, Length),
   Closure;
-receive_sexp(Sock, ?XT_ARRAY_INT,    Length)                          ->
+receive_sexp(Sock, ?xt_array_int,    Length)                          ->
   Array = receive_int_array(Sock, Length, []),
   Array;
-receive_sexp(Sock, ?XT_ARRAY_DOUBLE, Length)                          ->
+receive_sexp(Sock, ?xt_array_double, Length)                          ->
   Array = receive_double_array(Sock, Length, []),
   Array;
-receive_sexp(Sock, ?XT_ARRAY_STR,    Length)                          ->
+receive_sexp(Sock, ?xt_array_str,    Length)                          ->
   Array = receive_string_array(Sock, Length),
   Array.
 
@@ -218,15 +173,18 @@ receive_double(Sock) ->
 
 receive_string_array(Sock, Length) ->
   {ok, Data} = gen_tcp:recv(Sock, Length),
-  %% Strip off '\01'-padding, and split on null terminators
+  %% Strip off '\01'-padding, split on null terminators, strip more padding
   String     = string:strip(binary_to_list(Data), right, 1),
-  string:tokens(String, [0]).
+  Strings0   = string:tokens(String, [0]),
+  lists:map(fun(Str) ->
+                string:strip(Str, left, 1)
+            end, Strings0).
 
 receive_tagged_list(_Sock, 0,      Acc) ->
   lists:reverse(Acc);
 receive_tagged_list( Sock, Length, Acc) ->
-  {Value, ValueLength} = receive_item(Sock, ?DT_SEXP),
-  {Key,   KeyLength}   = receive_item(Sock, ?DT_SEXP),
+  {Value, ValueLength} = receive_item(Sock, ?dt_sexp),
+  {Key,   KeyLength}   = receive_item(Sock, ?dt_sexp),
   Item                 = {Key, Value},
   NewAcc               = [Item|Acc],
   RemainingLength      = Length - KeyLength - ValueLength,
@@ -235,120 +193,148 @@ receive_tagged_list( Sock, Length, Acc) ->
 receive_vector(_Sock, 0,      Acc) ->
   lists:reverse(Acc);
 receive_vector( Sock, Length, Acc) ->
-  {Item, UsedLength} = receive_item(Sock, ?DT_SEXP),
+  {Item, UsedLength} = receive_item(Sock, ?dt_sexp),
   NewAcc = [Item|Acc],
   RemainingLength = Length - UsedLength,
   receive_vector(Sock, RemainingLength, NewAcc).
 
 
 %%%_* Data sending functions ---------------------------------------------------
-send_expression(Sock, Expr, Command) ->
-  Length  = length(Expr),
-  Message = << Command:32/integer-little
-             , ?R_MSG_LENGTH(Length)
-             , ?R_OFFSET
-             , ?R_LENGTH2
-             , ?DT_STRING:8/integer-little
-             , ?R_EXP_LENGTH(Length)
-             , ?R_EXP(Expr)
-             , ?R_TERMINATE
-            >>,
-  gen_tcp:send(Sock, Message).
+message(eval,      String) ->
+  Body   = dt(string, String),
+  Length = iolist_size(Body),
+  [ header(?cmd_eval, Length)
+  , Body
+  ];
+message(eval_void, String) ->
+  Body   = dt(string, String),
+  Length = iolist_size(Body),
+  [ header(?cmd_void_eval, Length)
+  , Body
+  ];
+message({set_variable, Type}, {Name0, Value0}) ->
+  Name   = dt(string, Name0),
+  Value  = dt(sexp,   {Type, Value0}),
+  Body   = [Name, Value],
+  Length = iolist_size(Body),
+  [ header(?cmd_set_sexp, Length)
+  , Body
+  ].
 
-send_sexp(Sock, Name, Data) ->
-  case data_type(Data) of
-    int    ->
-      send_int_sexp(Sock, Name, Data);
-    double ->
-      send_double_sexp(Sock, Name, Data)
+header(Command, Length) ->
+  << Command:32/integer-little
+   , Length:32/integer-little
+   , 0:32/integer-little        % offset
+   , 0:32/integer-little        % currently only support 32-bit lengths
+  >>.
+
+dt(int,    Int) ->
+  [ << ?dt_int:8/integer-little
+     , ?size_int:24/integer-little >>
+  , transfer_int(Int)
+  ];
+dt(double, Double) ->
+  [ << ?dt_double:8/integer-little
+     , ?size_double:24/integer-little >>
+  , transfer_double(Double)
+  ];
+dt(string, String0) ->
+  String = transfer_string(String0),
+  Length = iolist_size(String),
+  [ << ?dt_string:8/integer-little
+     , Length:24/integer-little >>
+  , String
+  ];
+dt(sexp,   {Type, Sexp0}) ->
+  Sexp   = transfer_sexp({Type, Sexp0}),
+  Length = iolist_size(Sexp),
+  [ << ?dt_sexp:8/integer-little
+     , Length:24/integer-little >>
+  , Sexp
+  ].
+
+xt(array_int, Ints)       ->
+  [ xt_header(array_int, Ints)
+  , lists:map(fun transfer_int/1, Ints)
+  ];
+xt(array_double, Doubles) ->
+  [ xt_header(array_double, Doubles)
+  , lists:map(fun transfer_double/1, Doubles)
+  ];
+xt(array_string, Strings) ->
+  [ xt_header(array_string, Strings)
+  , lists:map(fun transfer_string/1, Strings)
+  ].
+
+xt_header(array_int, Ints)       ->
+  Length = length(Ints) * ?size_int,
+  xt_header(?xt_array_int, Length);
+xt_header(array_double, Doubles) ->
+  Length = length(Doubles) * ?size_double,
+  xt_header(?xt_array_double, Length);
+xt_header(array_string, Strings) ->
+  Length = lists:foldl(fun(Str, Acc) ->
+                           Acc + iolist_size(transfer_string(Str))
+                       end, 0, Strings),
+  xt_header(?xt_array_str, Length);
+xt_header(Type, Length)          ->
+  << Type:8/integer-little
+   , Length:24/integer-little
+  >>.
+
+
+%% Strings are transferred with a '\00' terminator and padded out
+%% with '\01' to become of a byte length that's divisible by 4.
+transfer_string(String0) ->
+  String  = [String0, <<0>>],
+  Length0 = iolist_size(String),
+  case (Length0 rem 4) of
+    0 -> String;
+    N -> [String, binary:copy(<<1>>, 4 - N)]
   end.
 
-send_int_sexp(Sock, Name0, Int) when is_integer(Int) ->
-  {NameLength, Name}   = terminate_and_pad_string(Name0),
-  IntLength            = 4,
-  MsgLength0           = NameLength + IntLength + ?DT_HEADER_LENGTH * 3,
-  {MsgLength, Padding} = length_and_padding(MsgLength0),
-  Message = << ?R_CMD_SET_SEXP:32/integer-little
-             , MsgLength:32/integer-little
-             , ?R_OFFSET
-             , ?R_LENGTH2
-             , ?DT_STRING:8/integer-little
-             , NameLength:24/integer-little
-             , Name/binary
-             , ?DT_SEXP:8/integer-little
-             , (IntLength + ?DT_HEADER_LENGTH):24/integer-little
-             , ?XT_ARRAY_INT:8/integer-little
-             , IntLength:24/integer-little
-             , Int:32/integer-little
-             , Padding/binary
-            >>,
-  io:format("Sending~n"),
-  binpp:pprint(Message),
-  gen_tcp:send(Sock, Message).
+transfer_int(Int) ->
+  <<Int:(?size_int * 8)/integer-little>>.
 
-send_double_sexp(_Sock, _Name, Data) when is_float(Data) ->
-  ok.
+transfer_double(Double) ->
+  <<Double:(?size_double * 8)/float-little>>.
 
-data_type(Data) when is_integer(Data) ->
-  int;
-data_type(Data) when is_float(Data)   ->
-  double.
-
-terminate_and_pad_string(Str0) ->
-  Str                = Str0 ++ [0],
-  Length0            = length(Str),
-  {Length, Padding} = length_and_padding(Length0),
-  {Length, iolist_to_binary([Str, Padding])}.
-
-%% Messages must be of length divisible by 4 and padded out with '\01'
-length_and_padding(MsgLength0) ->
-  io:format("length ~p~n", [MsgLength0]),
-  PaddingLength = (4 - (MsgLength0 rem 4)),
-  case PaddingLength of
-    4  ->
-      {MsgLength0, <<>>};
-    _N ->
-      MsgLength     = MsgLength0 + PaddingLength,
-      Padding       = padding(PaddingLength),
-      {MsgLength, Padding}
-  end.
-
-padding(Length) ->
-  binary:copy(<<1>>, Length).
+transfer_sexp({Type, Data}) ->
+  xt(Type, Data).
 
 
 %%%_* Error handling -----------------------------------------------------------
-error_from_code(?ERR_AUTH_FAILED)     ->
+error_from_code(?err_auth_failed)     ->
   auth_failed;
-error_from_code(?ERR_CONN_BROKEN)     ->
+error_from_code(?err_conn_broken)     ->
   connection_broken;
-error_from_code(?ERR_INV_CMD)         ->
+error_from_code(?err_inv_cmd)         ->
   invalid_command;
-error_from_code(?ERR_INV_PAR)         ->
+error_from_code(?err_inv_par)         ->
   invalid_parameters;
-error_from_code(?ERR_R_ERROR)         ->
+error_from_code(?err_r_error)         ->
   r_error_occurred;
-error_from_code(?ERR_IO_ERROR)        ->
+error_from_code(?err_io_error)        ->
   io_error;
-error_from_code(?ERR_NOT_OPEN)        ->
+error_from_code(?err_not_open)        ->
   file_not_open;
-error_from_code(?ERR_ACCESS_DENIED)   ->
+error_from_code(?err_access_denied)   ->
   access_denied;
-error_from_code(?ERR_UNSUPPORTED_CMD) ->
+error_from_code(?err_unsupported_cmd) ->
   unsupported_command;
-error_from_code(?ERR_UNKNOWN_CMD)     ->
+error_from_code(?err_unknown_cmd)     ->
   unknown_command;
-error_from_code(?ERR_DATA_OVERFLOW)   ->
+error_from_code(?err_data_overflow)   ->
   data_overflow;
-error_from_code(?ERR_OBJECT_TOO_BIG)  ->
+error_from_code(?err_object_too_big)  ->
   object_too_big;
-error_from_code(?ERR_OUT_OF_MEM)      ->
+error_from_code(?err_out_of_mem)      ->
   out_of_memory;
-error_from_code(?ERR_CTRL_CLOSED)     ->
+error_from_code(?err_ctrl_closed)     ->
   control_pipe_closed;
-error_from_code(?ERR_SESSION_BUSY)    ->
+error_from_code(?err_session_busy)    ->
   session_busy;
-error_from_code(?ERR_DETACH_FAILED)   ->
+error_from_code(?err_detach_failed)   ->
   unable_to_detach_session;
 error_from_code(Other)                ->
   {unknown_error, Other}.
