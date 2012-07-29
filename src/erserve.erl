@@ -88,22 +88,30 @@ open(Host, Port) ->
 
 %%%_* Commands -----------------------------------------------------------------
 -spec eval(connection(), r_expression()) ->
-              {ok, r_data()} | {error, error_code(), binary()}.
+              {ok, r_data()} | {error, error_code(), term()}.
 eval(Conn, Expr) ->
-  ok = erserve_comms:send_message(Conn, eval, Expr),
-  erserve_comms:receive_reply(Conn).
+  case erserve_comms:send_message(Conn, eval, Expr) of
+    ok             ->
+      erserve_comms:receive_reply(Conn);
+    {error, Error} ->
+      {error, tcp, Error}
+  end.
 
 -spec eval_void(connection(), r_expression()) ->
-                   ok | {error, error_code(), binary()}.
+                   ok | {error, error_code(), term()}.
 eval_void(Conn, Expr) ->
-  ok = erserve_comms:send_message(Conn, eval_void, Expr),
-  case erserve_comms:receive_reply(Conn) of
-    {ok, []}               -> ok;
-    {error, AckCode, Rest} -> {error, AckCode, Rest}
+  case erserve_comms:send_message(Conn, eval_void, Expr) of
+    ok             ->
+      case erserve_comms:receive_reply(Conn) of
+        {ok, []}               -> ok;
+        {error, AckCode, Rest} -> {error, AckCode, Rest}
+      end;
+    {error, Error} ->
+      {error, tcp, Error}
   end.
 
 -spec set_variable(connection(), string() | atom(), type(), r_data()) ->
-                      {ok, r_data()} | {error, error_code(), binary()}.
+                      {ok, r_data()} | {error, error_code(), term()}.
 set_variable(Conn, Name, Type,   Value) when is_atom(Name) ->
   set_variable(Conn, atom_to_list(Name), Type, Value);
 set_variable(Conn, Name, int,    Value)                    ->
@@ -111,8 +119,12 @@ set_variable(Conn, Name, int,    Value)                    ->
 set_variable(Conn, Name, double, Value)                    ->
   set_variable(Conn, Name, array_double, [Value]);
 set_variable(Conn, Name, Type, Value)                      ->
-  ok = erserve_comms:send_message(Conn, {set_variable, Type}, {Name, Value}),
-  erserve_comms:receive_reply(Conn).
+  case erserve_comms:send_message(Conn, {set_variable, Type}, {Name, Value}) of
+    ok             ->
+      erserve_comms:receive_reply(Conn);
+    {error, Error} ->
+      {error, tcp, Error}
+  end.
 
 
 %%%_* application callbacks ----------------------------------------------------
