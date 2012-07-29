@@ -25,12 +25,12 @@ types.
 
 2. Install [Rserve](http://www.rforge.net/Rserve/), which can be
    easily done using R's package system:
-   
+
        install.packages('Rserve')
 
 3. Start the Rserve server in R:
 
-       library(Rserve)  
+       library(Rserve)
        Rserve()
 
 4. Clone the erserve git library:
@@ -39,7 +39,7 @@ types.
 
 5. Compile erserve:
 
-       cd erserve  
+       cd erserve
        ./rebar compile
 
 6. Start an erlang node with erserve in its path:
@@ -48,10 +48,10 @@ types.
 
 7. Start the erserve application and connect to your Rserve
 
-       application:start(erserve).  
-       erserve:open(my_conn, "localhost", 6311).
+       application:start(erserve).
+       Conn = erserve:open("localhost", 6311).
 
 8. Send a message to R to verify the connection works:
 
-       erserve:eval(my_conn, "c(1, 2, 3)").  
-       % {ok,[{{array,double},[1.0,2.0,3.0]}]}
+       erserve:eval(Conn, "c(1, 2, 3)").
+       % {ok,[1.0,2.0,3.0]}
