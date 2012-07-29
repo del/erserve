@@ -14,6 +14,7 @@
 -define(dt_array,             11).
 -define(dt_large,             64).
 
+-define(xt_null,              0). % not actually a datatype according to Rserve
 -define(xt_int,               1).
 -define(xt_double,            2).
 -define(xt_str,               3).
@@ -22,13 +23,16 @@
 -define(xt_list,              17).
 -define(xt_clos,              18).
 -define(xt_symname,           19).
+-define(xt_list_notag,        20).
 -define(xt_list_tag,          21).
 -define(xt_lang_notag,        22).
+-define(xt_lang_tag,          23).
 -define(xt_vector_exp,        26).
 -define(xt_array_int,         32).
 -define(xt_array_double,      33).
 -define(xt_array_str,         34).
 
+-define(xt_large,             64).
 -define(xt_has_attr,          128).
 
 -define(err_auth_failed,      65).

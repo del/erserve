@@ -30,7 +30,7 @@ receive_reply(Conn) ->
 
 -spec send_message( erserve:connection()
                   , erserve:type()
-                  , erserve:r_data()) -> ok.
+                  , erserve:r_data()) -> ok | {error, term()}.
 send_message(Conn, Type, Data) ->
   Message = message(Type, Data),
   gen_tcp:send(Conn, Message).
@@ -78,7 +78,7 @@ receive_item(Conn, ?dt_sexp) ->
   Item = receive_sexp(Conn, SexpType, SexpLength),
   {Item, SexpLength + 4}.
 
-receive_sexp(Conn, Type,             Length) when Type > ?xt_has_attr ->
+receive_sexp( Conn, Type,             Length) when Type > ?xt_has_attr ->
   %% SEXP has attributes, so we need to read off the attribute SEXP
   %% before we get to this expression proper
   {AttrSexp, AttrSexpLength} = receive_item(Conn, ?dt_sexp),
@@ -86,26 +86,41 @@ receive_sexp(Conn, Type,             Length) when Type > ?xt_has_attr ->
                                             Type - ?xt_has_attr,
                                             Length - AttrSexpLength),
   {AttrSexp, Sexp};
-receive_sexp(Conn, ?xt_str,          Length)                          ->
+receive_sexp( Conn, Type,             Length) when Type > ?xt_large    ->
+  %% SEXP is large, which means the length is coded as a
+  %% 56-bit integer, enlarging the header by 4 bytes
+  {ok, RestLength} = gen_tcp:recv(Conn, 4),
+  FullLength = Length + (RestLength bsl 23),
+  receive_sexp(Conn, Type - ?xt_large, FullLength);
+receive_sexp(_Conn, ?xt_null,             0)                           ->
+  null;
+receive_sexp( Conn, ?xt_str,          Length)                          ->
   hd(receive_string_array(Conn, Length));
-receive_sexp(Conn, ?xt_vector,       Length)                          ->
+receive_sexp( Conn, ?xt_vector,       Length)                          ->
   receive_vector(Conn, Length, []);
-receive_sexp(Conn, ?xt_symname,      Length)                          ->
+receive_sexp( Conn, ?xt_symname,      Length)                          ->
   receive_sexp(Conn, ?xt_str, Length);
-receive_sexp(Conn, ?xt_list_tag,     Length)                          ->
+receive_sexp( Conn, ?xt_list_notag,   Length)                          ->
+  receive_sexp(Conn, ?xt_vector, Length);
+receive_sexp( Conn, ?xt_list_tag,     Length)                          ->
   receive_tagged_list(Conn, Length, []);
-receive_sexp(Conn, ?xt_lang_notag,   Length)                          ->
+receive_sexp( Conn, ?xt_lang_notag,   Length)                          ->
+  receive_sexp(Conn, ?xt_list_notag, Length);
+receive_sexp( Conn, ?xt_lang_tag,     Length)                          ->
+  receive_sexp(Conn, ?xt_list_tag, Length);
+receive_sexp( Conn, ?xt_vector_exp,   Length)                          ->
   receive_sexp(Conn, ?xt_vector, Length);
-receive_sexp(Conn, ?xt_vector_exp,   Length)                          ->
-  receive_sexp(Conn, ?xt_vector, Length);
-receive_sexp(Conn, ?xt_clos,         Length)                          ->
+receive_sexp( Conn, ?xt_clos,         Length)                          ->
   receive_closure(Conn, Length);
-receive_sexp(Conn, ?xt_array_int,    Length)                          ->
+receive_sexp( Conn, ?xt_array_int,    Length)                          ->
   receive_int_array(Conn, Length, []);
-receive_sexp(Conn, ?xt_array_double, Length)                          ->
+receive_sexp( Conn, ?xt_array_double, Length)                          ->
   receive_double_array(Conn, Length, []);
-receive_sexp(Conn, ?xt_array_str,    Length)                          ->
-  receive_string_array(Conn, Length).
+receive_sexp( Conn, ?xt_array_str,    Length)                          ->
+  receive_string_array(Conn, Length);
+receive_sexp( Conn, UnimplType,       Length)                          ->
+  receive_unimplemented_type(Conn, UnimplType, Length).
+
 
 receive_closure(Conn, Length) ->
   {ok, Closure} = gen_tcp:recv(Conn, Length),
@@ -163,6 +178,9 @@ receive_vector( Conn, Length, Acc) ->
   NewAcc = [Item|Acc],
   RemainingLength = Length - UsedLength,
   receive_vector(Conn, RemainingLength, NewAcc).
+
+receive_unimplemented_type(Conn, Type, Length) ->
+  {unimplemented_type, Type, gen_tcp:recv(Conn, Length)}.
 
 
 %%%_* Data sending functions ---------------------------------------------------
