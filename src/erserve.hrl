@@ -2,8 +2,8 @@
 -define(cmd_eval,             3).
 -define(cmd_set_sexp,         32).
 
--define(resp_ok,              16#10001:32/integer-little).
--define(resp_error,           16#10002:32/integer-little).
+-define(resp_ok,              16#10001).
+-define(resp_error,           16#10002).
 
 -define(dt_int,               1).
 -define(dt_char,              2).
@@ -31,6 +31,7 @@
 -define(xt_array_int,         32).
 -define(xt_array_double,      33).
 -define(xt_array_str,         34).
+-define(xt_array_bool,        36).
 
 -define(xt_large,             64).
 -define(xt_has_attr,          128).
@@ -55,3 +56,4 @@
 -define(size_int,             4).
 -define(size_double,          8).
 -define(size_char,            1).
+-define(size_bool,            1).

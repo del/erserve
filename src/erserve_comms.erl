@@ -24,8 +24,8 @@ receive_connection_ack(Conn) ->
 receive_reply(Conn) ->
   {ok, AckCode} = gen_tcp:recv(Conn, 4),
   case AckCode of
-    <<?resp_ok>> -> receive_reply_1(Conn);
-    _            -> receive_reply_error(Conn, AckCode)
+    <<?resp_ok:32/integer-little>> -> receive_reply_1(Conn);
+    _                              -> receive_reply_error(Conn, AckCode)
   end.
 
 -spec send_message( erserve:connection()
@@ -118,6 +118,8 @@ receive_sexp( Conn, ?xt_array_double, Length)                          ->
   receive_double_array(Conn, Length, []);
 receive_sexp( Conn, ?xt_array_str,    Length)                          ->
   receive_string_array(Conn, Length);
+receive_sexp( Conn, ?xt_array_bool,   Length)                          ->
+  receive_bool_array(Conn, Length);
 receive_sexp( Conn, UnimplType,       Length)                          ->
   receive_unimplemented_type(Conn, UnimplType, Length).
 
@@ -160,6 +162,21 @@ receive_string_array(Conn, Length) ->
   lists:map(fun(Str) ->
                 string:strip(Str, left, 1)
             end, Strings0).
+
+receive_bool_array(Conn, Length) ->
+  {ok, Data0} = gen_tcp:recv(Conn, Length),
+  << N:32/integer-little
+   , Data/binary
+  >> = Data0,
+  NBoolBits = N * ?size_bool * 8,
+  << Bools:NBoolBits/bitstring
+   , _Padding/binary
+  >> = Data,
+  lists:map(fun(1) ->
+                true;
+               (0) ->
+                false
+            end, binary_to_list(Bools)).
 
 receive_tagged_list(_Conn, 0,      Acc) ->
   lists:reverse(Acc);
