@@ -5,36 +5,36 @@
 -define(resp_ok,              16#10001).
 -define(resp_error,           16#10002).
 
--define(dt_int,               1).
--define(dt_char,              2).
--define(dt_double,            3).
--define(dt_string,            4).
--define(dt_bytestream,        5).
--define(dt_sexp,              10).
--define(dt_array,             11).
--define(dt_large,             64).
+-define(dt_int,               1).  % 01
+-define(dt_char,              2).  % 02
+-define(dt_double,            3).  % 03
+-define(dt_string,            4).  % 04
+-define(dt_bytestream,        5).  % 05
+-define(dt_sexp,              10). % 0A
+-define(dt_array,             11). % 0B
+-define(dt_large,             64). % 40
 
--define(xt_null,              0). % not actually a datatype according to Rserve
--define(xt_int,               1).
--define(xt_double,            2).
--define(xt_str,               3).
--define(xt_lang,              4).
--define(xt_vector,            16).
--define(xt_list,              17).
--define(xt_clos,              18).
--define(xt_symname,           19).
--define(xt_list_notag,        20).
--define(xt_list_tag,          21).
--define(xt_lang_notag,        22).
--define(xt_lang_tag,          23).
--define(xt_vector_exp,        26).
--define(xt_array_int,         32).
--define(xt_array_double,      33).
--define(xt_array_str,         34).
--define(xt_array_bool,        36).
+-define(xt_null,              0).  % not actually a datatype according to Rserve
+-define(xt_int,               1).  % 01
+-define(xt_double,            2).  % 02
+-define(xt_str,               3).  % 03
+-define(xt_lang,              4).  % 04
+-define(xt_vector,            16). % 10
+-define(xt_list,              17). % 11
+-define(xt_clos,              18). % 12
+-define(xt_symname,           19). % 13
+-define(xt_list_notag,        20). % 14
+-define(xt_list_tag,          21). % 15
+-define(xt_lang_notag,        22). % 16
+-define(xt_lang_tag,          23). % 17
+-define(xt_vector_exp,        26). % 1A
+-define(xt_array_int,         32). % 20
+-define(xt_array_double,      33). % 21
+-define(xt_array_str,         34). % 22
+-define(xt_array_bool,        36). % 24
 
--define(xt_large,             64).
--define(xt_has_attr,          128).
+-define(xt_large,             64).  % 40
+-define(xt_has_attr,          128). % 80
 
 -define(err_auth_failed,      65).
 -define(err_conn_broken,      66).
