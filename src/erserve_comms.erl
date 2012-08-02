@@ -254,31 +254,41 @@ dt(sexp,   {Type, Sexp0}) ->
   , Sexp
   ].
 
-xt(array_int, Ints)       ->
-  [ xt_header(array_int, Ints)
-  , lists:map(fun transfer_int/1, Ints)
+xt(array_int,    Ints)       ->
+  Payload = lists:map(fun transfer_int/1, Ints),
+  [ xt_header(?xt_array_int, Payload)
+  , Payload
   ];
-xt(array_double, Doubles) ->
-  [ xt_header(array_double, Doubles)
-  , lists:map(fun transfer_double/1, Doubles)
+xt(array_double, Doubles)    ->
+  Payload = lists:map(fun transfer_double/1, Doubles),
+  [ xt_header(?xt_array_double, Payload)
+  , Payload
   ];
-xt(array_string, Strings) ->
-  [ xt_header(array_string, Strings)
-  , lists:map(fun transfer_string/1, Strings)
-  ].
+xt(array_string, Strings)    ->
+  Payload = lists:map(fun transfer_string/1, Strings),
+  [ xt_header(?xt_array_str, Payload)
+  , Payload
+  ];
+xt(list_tag,     TaggedList) ->
+  Payload = lists:map(fun transfer_tagged/1, TaggedList),
+  [ xt_header(?xt_list_tag, Payload)
+  , Payload
+  ];
+xt(symname,      Symbol)     ->
+  Payload = transfer_string(Symbol),
+  [ xt_header(?xt_symname, Payload)
+  , Payload
+  ];
+xt(vector,       Elements)   ->
+  Payload = lists:map(fun transfer_sexp/1, Elements),
+  [ xt_header(?xt_vector, Payload)
+  , Payload
+  ];
+xt(data_frame,   DataFrame)  ->
+  transfer_df(DataFrame).
 
-xt_header(array_int, Ints)       ->
-  Length = length(Ints) * ?size_int,
-  xt_header(?xt_array_int, Length);
-xt_header(array_double, Doubles) ->
-  Length = length(Doubles) * ?size_double,
-  xt_header(?xt_array_double, Length);
-xt_header(array_string, Strings) ->
-  Length = lists:foldl(fun(Str, Acc) ->
-                           Acc + iolist_size(transfer_string(Str))
-                       end, 0, Strings),
-  xt_header(?xt_array_str, Length);
-xt_header(Type, Length)          ->
+xt_header(Type, Payload) ->
+  Length = iolist_size(Payload),
   << Type:8/integer-little
    , Length:24/integer-little
   >>.
@@ -300,8 +310,40 @@ transfer_int(Int) ->
 transfer_double(Double) ->
   <<Double:(?size_double * 8)/float-little>>.
 
+transfer_tagged({Tag, Value}) ->
+  [ transfer_sexp(Value)
+  , transfer_sexp(Tag)
+  ].
+
+transfer_df(DataFrame) ->
+  Names    = df_names(DataFrame),
+  RowNames = df_row_names(DataFrame),
+  Values   = df_values(DataFrame),
+  AttrSexp = {list_tag, [ { {symname,      "names"}
+                          , {array_string, Names}
+                          }
+                        , { {symname,      "row.names"}
+                          , {array_int,    RowNames}
+                          }
+                        , { {symname,      "class"}
+                          , {array_string, ["data.frame"]}
+                          }
+                        ]},
+  transfer_sexp_with_attr(AttrSexp, {vector, Values}).
+
 transfer_sexp({Type, Data}) ->
   xt(Type, Data).
+
+transfer_sexp_with_attr(AttrSexp, Sexp) ->
+  AttrBin           = transfer_sexp(AttrSexp),
+  [Header, Payload] = transfer_sexp(Sexp),
+  FullPayload       = [AttrBin, Payload],
+  << Type:8/integer-little
+   , _Length:24/integer-little
+  >> = Header,
+  [ xt_header(Type + ?xt_has_attr, FullPayload)
+  , FullPayload
+  ].
 
 
 %%%_* Error handling -----------------------------------------------------------
@@ -339,3 +381,23 @@ error_from_code(?err_detach_failed)   ->
   unable_to_detach_session;
 error_from_code(Other)                ->
   {unknown_error, Other}.
+
+
+%%%_* Helpers for sending lists and data frames --------------------------------
+df_names(DataFrame) ->
+  lists:map(fun({Name, _Type, _Values}) ->
+                case Name of
+                  NAtom when is_atom(NAtom) -> atom_to_list(NAtom);
+                  NStr  when is_list(NStr)  -> NStr
+                end
+            end, DataFrame).
+
+df_values(DataFrame) ->
+  lists:map(fun({_Name, Type, Values}) ->
+                {Type, Values}
+            end, DataFrame).
+
+df_row_names(DataFrame) ->
+  {_Name, _Type, Values} = hd(DataFrame),
+  N = length(Values),
+  lists:seq(1, N).
