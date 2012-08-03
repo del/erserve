@@ -160,7 +160,7 @@ receive_string_array(Conn, Length) ->
   String     = string:strip(binary_to_list(Data), right, 1),
   Strings0   = string:tokens(String, [0]),
   lists:map(fun(Str) ->
-                string:strip(Str, left, 1)
+                list_to_binary(string:strip(Str, left, 1))
             end, Strings0).
 
 receive_bool_array(Conn, Length) ->
