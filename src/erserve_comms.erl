@@ -346,6 +346,26 @@ transfer_sexp_with_attr(AttrSexp, Sexp) ->
   ].
 
 
+%%%_* Helpers for sending lists and data frames --------------------------------
+df_names(DataFrame) ->
+  lists:map(fun({Name, _Type, _Values}) ->
+                case Name of
+                  NAtom when is_atom(NAtom) -> atom_to_list(NAtom);
+                  NStr  when is_list(NStr)  -> NStr
+                end
+            end, DataFrame).
+
+df_values(DataFrame) ->
+  lists:map(fun({_Name, Type, Values}) ->
+                {Type, Values}
+            end, DataFrame).
+
+df_row_names(DataFrame) ->
+  {_Name, _Type, Values} = hd(DataFrame),
+  N = length(Values),
+  lists:seq(1, N).
+
+
 %%%_* Error handling -----------------------------------------------------------
 error_from_code(?err_auth_failed)     ->
   auth_failed;
@@ -381,23 +401,3 @@ error_from_code(?err_detach_failed)   ->
   unable_to_detach_session;
 error_from_code(Other)                ->
   {unknown_error, Other}.
-
-
-%%%_* Helpers for sending lists and data frames --------------------------------
-df_names(DataFrame) ->
-  lists:map(fun({Name, _Type, _Values}) ->
-                case Name of
-                  NAtom when is_atom(NAtom) -> atom_to_list(NAtom);
-                  NStr  when is_list(NStr)  -> NStr
-                end
-            end, DataFrame).
-
-df_values(DataFrame) ->
-  lists:map(fun({_Name, Type, Values}) ->
-                {Type, Values}
-            end, DataFrame).
-
-df_row_names(DataFrame) ->
-  {_Name, _Type, Values} = hd(DataFrame),
-  N = length(Values),
-  lists:seq(1, N).

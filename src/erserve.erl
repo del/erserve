@@ -27,27 +27,41 @@
 
 
 %%%_* Types --------------------------------------------------------------------
--opaque connection()   :: gen_tcp:socket().
--type   r_expression() :: string().
--type   r_data()       :: integer()
-                        | float()
-                        | string()
-                        | [ integer() ]
-                        | [ float() ]
-                        | [ string() ]
-                        | [ { r_data(), r_data() } ].
--type   error_code()   :: atom().
--type   type()         :: int
-                        | double
-                        | string
-                        | array_int
-                        | array_double
-                        | array_string.
+-opaque connection()  :: gen_tcp:socket().
+-type   expression()  :: string().
+-type   r_data()      :: integer()
+                       | float()
+                       | binary()
+                       | sexp()
+                       | list_tag()
+                       | data_frame()
+                       | [ r_data() ].
+-type   sexp()        :: { type(), r_data() }.
+-type   list_tag()    :: [ { sexp(), sexp() } ].
+-type   data_frame()  :: [ { column_name(), r_data() } ].
+-type   column_name() :: string().
+-type   error_code()  :: atom().
+-type   type()        :: int
+                       | double
+                       | string
+                       | sexp
+                       | array_int
+                       | array_double
+                       | array_string
+                       | array_bool
+                       | list_tag
+                       | symname
+                       | vector
+                       | data_frame.
 
 -export_type([ connection/0
+             , column_name/0
              , error_code/0
+             , expression/0
+             , data_frame/0
+             , list_tag/0
              , r_data/0
-             , r_expression/0
+             , sexp/0
              , type/0
              ]).
 
@@ -87,7 +101,7 @@ open(Host, Port) ->
 
 
 %%%_* Commands -----------------------------------------------------------------
--spec eval(connection(), r_expression()) ->
+-spec eval(connection(), expression()) ->
               {ok, r_data()} | {error, error_code(), term()}.
 eval(Conn, Expr) ->
   case erserve_comms:send_message(Conn, eval, Expr) of
@@ -97,7 +111,7 @@ eval(Conn, Expr) ->
       {error, tcp, Error}
   end.
 
--spec eval_void(connection(), r_expression()) ->
+-spec eval_void(connection(), expression()) ->
                    ok | {error, error_code(), term()}.
 eval_void(Conn, Expr) ->
   case erserve_comms:send_message(Conn, eval_void, Expr) of
