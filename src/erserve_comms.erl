@@ -137,8 +137,8 @@ receive_int_array( Conn, Length, Acc) ->
   receive_int_array(Conn, RemainingLength, NewAcc).
 
 receive_int(Conn) ->
-  {ok, Data}                = gen_tcp:recv(Conn, 4),
-  <<Int:32/integer-little>> = Data,
+  {ok, Data}                       = gen_tcp:recv(Conn, 4),
+  <<Int:32/integer-signed-little>> = Data,
   Int.
 
 receive_double_array(_Conn, 0,      Acc) ->
@@ -305,7 +305,7 @@ transfer_string(String0) ->
   end.
 
 transfer_int(Int) ->
-  <<Int:(?size_int * 8)/integer-little>>.
+  <<Int:(?size_int * 8)/integer-signed-little>>.
 
 transfer_double(Double) ->
   <<Double:(?size_double * 8)/float-little>>.
