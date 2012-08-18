@@ -27,15 +27,41 @@
 
 
 %%%_* Types --------------------------------------------------------------------
--opaque connection()   :: gen_tcp:socket().
--type   r_expression() :: string().
--type   r_data()       :: integer()
-                        | float()
-                        | string()
-                        | [ integer() ]
-                        | [ float() ]
-                        | [ string() ]
-                        | [ { r_data(), r_data() } ].
+-opaque connection()    :: gen_tcp:socket().
+-type   r_expression()  :: string().
+-type   r_data()        :: {xt_str,          string()}
+                         | {xt_array_bool,   [ boolean() ]}
+                         | {xt_array_double, [ float() ]}
+                         | {xt_array_int,    [ integer() ]}
+                         | {xt_array_str,    [ string() ]}
+                         | {xt_list_tag,     [ {r_data(), r_data()} ]}
+                         | {xt_vector,       [ r_data() ]}
+                         | {xt_has_attr,     { tag(), r_data() }}.
+-type   tag()           :: [ {{xt_str, string()}, r_data()} ].
+-type   r_type()        :: xt_str
+                         | xt_array_bool
+                         | xt_array_double
+                         | xt_array_int
+                         | xt_array_str
+                         | xt_list_tag
+                         | xt_vector
+                         | dataframe
+                         | list
+                         | unsupported.
+-type   r_class()       :: string().
+-type   untagged_data() :: float()
+                         | integer()
+                         | string()
+                         | [ float() ]
+                         | [ integer() ]
+                         | [ string() ]
+                         | [ untagged_data() ].
+-type   r_df()         :: { xt_has_attr
+                          , { {xt_list_tag, [ r_data() ]}
+                            , {xt_vector,   [ r_data() ]}
+                            }
+                          }.
+-type   df()           :: [ { Name :: string(), r_data() } ].
 -type   error_code()   :: atom().
 -type   type()         :: int
                         | double
@@ -110,8 +136,8 @@ eval_void(Conn, Expr) ->
       {error, tcp, Error}
   end.
 
--spec set_variable(connection(), string() | atom(), type(), r_data()) ->
-                      {ok, r_data()} | {error, error_code(), term()}.
+-spec set_variable(connection(), string() | atom(), type(), untagged_data()) ->
+                          {ok, r_data()} | {error, error_code(), term()}.
 set_variable(Conn, Name, Type,   Value) when is_atom(Name) ->
   set_variable(Conn, atom_to_list(Name), Type, Value);
 set_variable(Conn, Name, int,    Value)                    ->
