@@ -1,4 +1,13 @@
+%%%-----------------------------------------------------------------------------
+%%% @doc This module handles the binary protocol communication with an Rserve
+%%%      server, sending and receiving messages, and parsing them to an internal
+%%%      format. Unimplemented data types are received simply as a binary blob.
+%%%
+%%% @author Daniel Eliasson <daniel@danieleliasson.com>
+%%% @copyright 2012 Daniel Eliasson; Apache 2.0 license -- see LICENSE file
+%%% @end------------------------------------------------------------------------
 -module(erserve_comms).
+
 
 %%%_* Exports ------------------------------------------------------------------
 -export([ receive_connection_ack/1

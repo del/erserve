@@ -6,14 +6,22 @@
 
 %%%_* Exports ------------------------------------------------------------------
 
-%% External API
+%% Connection handling
 -export([ close/1
-        , eval/2
-        , eval_void/2
         , open/0
         , open/1
         , open/2
+        ]).
+
+%% R commands
+-export([ eval/2
+        , eval_void/2
         , set_variable/4
+        ]).
+
+%% Data parsing
+-export([ type/1
+        , parse/1
         ]).
 
 %% application callbacks
@@ -29,7 +37,7 @@
 %%%_* Types --------------------------------------------------------------------
 -opaque connection()    :: gen_tcp:socket().
 -type   r_expression()  :: string().
--type   r_data()        :: {xt_str,          string()}
+-opaque r_data()        :: {xt_str,          string()}
                          | {xt_array_bool,   [ boolean() ]}
                          | {xt_array_double, [ float() ]}
                          | {xt_array_int,    [ integer() ]}
@@ -37,7 +45,7 @@
                          | {xt_list_tag,     [ {r_data(), r_data()} ]}
                          | {xt_vector,       [ r_data() ]}
                          | {xt_has_attr,     { tag(), r_data() }}.
--type   tag()           :: [ {{xt_str, string()}, r_data()} ].
+-opaque tag()           :: [ {{xt_str, string()}, r_data()} ].
 -type   r_type()        :: xt_str
                          | xt_array_bool
                          | xt_array_double
@@ -48,6 +56,11 @@
                          | dataframe
                          | list
                          | unsupported.
+-opaque r_df()         :: { xt_has_attr
+                          , { {xt_list_tag, [ r_data() ]}
+                            , {xt_vector,   [ r_data() ]}
+                            }
+                          }.
 -type   r_class()       :: string().
 -type   untagged_data() :: float()
                          | integer()
@@ -55,12 +68,8 @@
                          | [ float() ]
                          | [ integer() ]
                          | [ string() ]
-                         | [ untagged_data() ].
--type   r_df()         :: { xt_has_attr
-                          , { {xt_list_tag, [ r_data() ]}
-                            , {xt_vector,   [ r_data() ]}
-                            }
-                          }.
+                         | [ untagged_data() ]
+                         | df().
 -type   df()           :: [ { Name :: string(), r_data() } ].
 -type   error_code()   :: atom().
 -type   type()         :: int
@@ -72,8 +81,11 @@
 
 -export_type([ connection/0
              , error_code/0
+             , r_class/0
              , r_data/0
+             , r_df/0
              , r_expression/0
+             , r_type/0
              , type/0
              ]).
 
@@ -112,7 +124,7 @@ open(Host, Port) ->
   end.
 
 
-%%%_* Commands -----------------------------------------------------------------
+%%%_* R commands ---------------------------------------------------------------
 -spec eval(connection(), r_expression()) ->
               {ok, r_data()} | {error, error_code(), term()}.
 eval(Conn, Expr) ->
@@ -120,6 +132,7 @@ eval(Conn, Expr) ->
     ok             ->
       erserve_comms:receive_reply(Conn);
     {error, Error} ->
+      close(Conn),
       {error, tcp, Error}
   end.
 
@@ -133,6 +146,7 @@ eval_void(Conn, Expr) ->
         {error, AckCode, Rest} -> {error, AckCode, Rest}
       end;
     {error, Error} ->
+      close(Conn),
       {error, tcp, Error}
   end.
 
@@ -149,8 +163,19 @@ set_variable(Conn, Name, Type, Value)                      ->
     ok             ->
       erserve_comms:receive_reply(Conn);
     {error, Error} ->
+      close(Conn),
       {error, tcp, Error}
   end.
+
+
+%%%_* Data parsing -------------------------------------------------------------
+-spec type(r_data()) -> r_type().
+type(Rdata) ->
+  erserve_data:type(Rdata).
+
+-spec parse(r_data()) -> untagged_data().
+parse(Rdata) ->
+  erserve_data:parse(Rdata).
 
 
 %%%_* application callbacks ----------------------------------------------------
