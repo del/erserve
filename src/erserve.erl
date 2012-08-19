@@ -1,3 +1,15 @@
+%%%-----------------------------------------------------------------------------
+%%% @doc erserve allows Erlang code to call R code via Rserve. The basic usage
+%%%      is to open a connection and send one or more commands to it, then use
+%%%      the type/1 and parse/1 functions to transfer the data from internal
+%%%      representation to "Erlangy" formats.
+%%%
+%%% @reference For more information, see <a href="http://r-project.org">R</a>
+%%%            and <a href="http://rforge.net/Rserve/">Rserve</a>.
+%%%
+%%% @author Daniel Eliasson <daniel@danieleliasson.com>
+%%% @copyright 2012 Daniel Eliasson; Apache 2.0 license -- see LICENSE file
+%%% @end------------------------------------------------------------------------
 -module(erserve).
 
 -behaviour(application).
