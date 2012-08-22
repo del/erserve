@@ -98,11 +98,9 @@
                         | dataframe.
 
 -export_type([ connection/0
-             , column_name/0
              , error_code/0
              , r_class/0
              , r_data/0
-             , r_expression/0
              , r_df/0
              , r_expression/0
              , r_type/0
@@ -156,7 +154,7 @@ eval(Conn, Expr) ->
       {error, tcp, Error}
   end.
 
--spec eval_void(connection(), expression()) ->
+-spec eval_void(connection(), r_expression()) ->
                    ok | {error, error_code(), term()}.
 eval_void(Conn, Expr) ->
   case erserve_comms:send_message(Conn, eval_void, Expr) of
