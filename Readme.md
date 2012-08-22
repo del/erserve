@@ -79,6 +79,9 @@ To close a connection, simply send it to `close/1`:
 ok = close(Conn).
 ```
 
+If you are in need of connection pooling, take a look at
+[erserve_pool](http://github.com/del/erserve_pool).
+
 
 ## Issuing R commands
 
@@ -138,3 +141,9 @@ ok = erserve:set_variable(Conn, "some.var", xt_vector,       [ {xt_array_str, ["
 ok = erserve:set_variable(Conn, "some.var", dataframe,       [ {"Letters", xt_array_str, ["a", "b"]}
                                                              , {"Numbers", xt_array_int, [1, 3]} ]).
 ```
+
+
+## Acknowledgements
+
+Thanks to my employer, [Klarna](http://klarna.com/) for allowing me to contribute to open source
+as part of my work.
