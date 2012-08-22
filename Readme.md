@@ -80,7 +80,7 @@ ok = close(Conn).
 ```
 
 
-## Issuing R commands and uploading variables
+## Issuing R commands
 
 erserve supports two ways of running R commands: `eval_void/2` and `eval/2`.
 The difference is that `eval_void/2` only receives an `ok` or `{error, ErrorCode, Reason}` as reply,
@@ -101,12 +101,40 @@ returned data, make use of the `type/1` and `parse/1` functions:
               end.
 ```
 
+
+## Sending/receiving data
+
 It's possible to upload a variable to R directly in binary format, to avoid having to create
 expression strings for everything. To do this, use `set_variable/4`, which has the signature
 `set_variable(Conn, Name, Type, Value)`.
 ```erlang
-ok                     = erserve:set_variable(Conn, "some.var", array_string, ["bla", "bla"]),
+ok                     = erserve:set_variable(Conn, "some.var", xt_array_str, ["bla", "bla"]),
 {ok, Rdata}            = erserve:eval(Conn, "some.var"),
 xt_array_str           = erserve:type(Rdata),
 [<<"bla">>, <<"bla">>] = erserve:parse(Rdata).
+```
+
+Note that erserve outputs all strings in binary format.
+
+At the moment, uploading of variables supports the simple R types `xt_str`, `xt_array_double`,
+`xt_array_int` and `xt_array_str`. On top of this, it also supports the more advanced formats
+`xt_vector` and `dataframe`.
+
+An `xt_vector` consists of a list of tuples `{Type, Value}` where `Type` is one of the just
+mentioned types.
+
+A dataframe is a list of tuples `{Name, Type, Value}`. Each such tuple generates a column in the
+resulting dataframe, where `Name` is a string that becomes the column's name, and `Type` and
+`Value` are as described before.
+
+Some examples of variable uploading:
+```erlang
+ok = erserve:set_variable(Conn, "some.var", xt_str,          "hello world"),
+ok = erserve:set_variable(Conn, "some.var", xt_array_double, [1.1, 2.2, 3.3]),
+ok = erserve:set_variable(Conn, "some.var", xt_array_int,    [1, 2, 3]),
+ok = erserve:set_variable(Conn, "some.var", xt_array_str,    ["hello", "world"]),
+ok = erserve:set_variable(Conn, "some.var", xt_vector,       [ {xt_array_str, ["a", "b"]}
+                                                             , {xt_array_int, [1, 3, 5]} ]),
+ok = erserve:set_variable(Conn, "some.var", dataframe,       [ {"Letters", xt_array_str, ["a", "b"]}
+                                                             , {"Numbers", xt_array_int, [1, 3]} ]).
 ```
