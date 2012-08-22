@@ -1,4 +1,13 @@
+%%%-----------------------------------------------------------------------------
+%%% @doc This module handles the binary protocol communication with an Rserve
+%%%      server, sending and receiving messages, and parsing them to an internal
+%%%      format. Unimplemented data types are received simply as a binary blob.
+%%%
+%%% @author Daniel Eliasson <daniel@danieleliasson.com>
+%%% @copyright 2012 Daniel Eliasson; Apache 2.0 license -- see LICENSE file
+%%% @end------------------------------------------------------------------------
 -module(erserve_comms).
+
 
 %%%_* Exports ------------------------------------------------------------------
 -export([ receive_connection_ack/1
@@ -30,7 +39,7 @@ receive_reply(Conn) ->
 
 -spec send_message( erserve:connection()
                   , erserve:type()
-                  , erserve:r_data()) -> ok | {error, term()}.
+                  , erserve:untagged_data()) -> ok | {error, term()}.
 send_message(Conn, Type, Data) ->
   Message = message(Type, Data),
   gen_tcp:send(Conn, Message).
@@ -85,7 +94,7 @@ receive_sexp( Conn, Type,             Length) when Type > ?xt_has_attr ->
   Sexp                       = receive_sexp(Conn,
                                             Type - ?xt_has_attr,
                                             Length - AttrSexpLength),
-  {AttrSexp, Sexp};
+  {xt_has_attr, {AttrSexp, Sexp}};
 receive_sexp( Conn, Type,             Length) when Type > ?xt_large    ->
   %% SEXP is large, which means the length is coded as a
   %% 56-bit integer, enlarging the header by 4 bytes
@@ -93,9 +102,10 @@ receive_sexp( Conn, Type,             Length) when Type > ?xt_large    ->
   FullLength = Length + (RestLength bsl 23),
   receive_sexp(Conn, Type - ?xt_large, FullLength);
 receive_sexp(_Conn, ?xt_null,             0)                           ->
-  null;
+  {xt_null, null};
 receive_sexp( Conn, ?xt_str,          Length)                          ->
-  hd(receive_string_array(Conn, Length));
+  {xt_array_str, StringArray} = receive_string_array(Conn, Length),
+  {xt_str, hd(StringArray)};
 receive_sexp( Conn, ?xt_vector,       Length)                          ->
   receive_vector(Conn, Length, []);
 receive_sexp( Conn, ?xt_symname,      Length)                          ->
@@ -126,10 +136,10 @@ receive_sexp( Conn, UnimplType,       Length)                          ->
 
 receive_closure(Conn, Length) ->
   {ok, Closure} = gen_tcp:recv(Conn, Length),
-  Closure.
+  {closure, Closure}.
 
 receive_int_array(_Conn, 0,      Acc) ->
-  lists:reverse(Acc);
+  {xt_array_int, lists:reverse(Acc)};
 receive_int_array( Conn, Length, Acc) ->
   Int             = receive_int(Conn),
   NewAcc          = [Int|Acc],
@@ -142,7 +152,7 @@ receive_int(Conn) ->
   Int.
 
 receive_double_array(_Conn, 0,      Acc) ->
-  lists:reverse(Acc);
+  {xt_array_double, lists:reverse(Acc)};
 receive_double_array( Conn, Length, Acc) ->
   Double          = receive_double(Conn),
   NewAcc          = [Double|Acc],
@@ -159,27 +169,29 @@ receive_string_array(Conn, Length) ->
   %% Strip off '\01'-padding, split on null terminators, strip more padding
   String     = string:strip(binary_to_list(Data), right, 1),
   Strings0   = string:tokens(String, [0]),
-  lists:map(fun(Str) ->
-                list_to_binary(string:strip(Str, left, 1))
-            end, Strings0).
+  Strings    = lists:map(fun(Str) ->
+                             list_to_binary(string:strip(Str, left, 1))
+                         end, Strings0),
+  {xt_array_str, Strings}.
 
 receive_bool_array(Conn, Length) ->
   {ok, Data0} = gen_tcp:recv(Conn, Length),
   << N:32/integer-little
    , Data/binary
-  >> = Data0,
+  >>     = Data0,
   NBoolBits = N * ?size_bool * 8,
   << Bools:NBoolBits/bitstring
    , _Padding/binary
-  >> = Data,
-  lists:map(fun(1) ->
-                true;
-               (0) ->
-                false
-            end, binary_to_list(Bools)).
+  >>    = Data,
+  BoolArray = lists:map(fun(1) ->
+                            true;
+                           (0) ->
+                            false
+                        end, binary_to_list(Bools)),
+  {xt_array_bool, BoolArray}.
 
 receive_tagged_list(_Conn, 0,      Acc) ->
-  lists:reverse(Acc);
+  {xt_list_tag, lists:reverse(Acc)};
 receive_tagged_list( Conn, Length, Acc) ->
   {Value, ValueLength} = receive_item(Conn, ?dt_sexp),
   {Key,   KeyLength}   = receive_item(Conn, ?dt_sexp),
@@ -189,7 +201,7 @@ receive_tagged_list( Conn, Length, Acc) ->
   receive_tagged_list(Conn, RemainingLength, NewAcc).
 
 receive_vector(_Conn, 0,      Acc) ->
-  lists:reverse(Acc);
+  {xt_vector, lists:reverse(Acc)};
 receive_vector( Conn, Length, Acc) ->
   {Item, UsedLength} = receive_item(Conn, ?dt_sexp),
   NewAcc = [Item|Acc],
@@ -197,7 +209,7 @@ receive_vector( Conn, Length, Acc) ->
   receive_vector(Conn, RemainingLength, NewAcc).
 
 receive_unimplemented_type(Conn, Type, Length) ->
-  {unimplemented_type, Type, gen_tcp:recv(Conn, Length)}.
+  {{unimplemented_type, Type}, gen_tcp:recv(Conn, Length)}.
 
 
 %%%_* Data sending functions ---------------------------------------------------
@@ -284,7 +296,7 @@ xt(vector,       Elements)   ->
   [ xt_header(?xt_vector, Payload)
   , Payload
   ];
-xt(data_frame,   DataFrame)  ->
+xt(dataframe,    DataFrame)  ->
   transfer_df(DataFrame).
 
 xt_header(Type, Payload) ->
@@ -350,8 +362,8 @@ transfer_sexp_with_attr(AttrSexp, Sexp) ->
 df_names(DataFrame) ->
   lists:map(fun({Name, _Type, _Values}) ->
                 case Name of
-                  NAtom when is_atom(NAtom) -> atom_to_list(NAtom);
-                  NStr  when is_list(NStr)  -> NStr
+                  NAtom when is_atom(NAtom)  -> atom_to_list(NAtom);
+                  NStr  when is_binary(NStr) -> NStr
                 end
             end, DataFrame).
 
