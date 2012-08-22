@@ -241,16 +241,6 @@ header(Command, Length) ->
    , 0:32/integer-little        % currently only support 32-bit lengths
   >>.
 
-dt(int,    Int) ->
-  [ << ?dt_int:8/integer-little
-     , ?size_int:24/integer-little >>
-  , transfer_int(Int)
-  ];
-dt(double, Double) ->
-  [ << ?dt_double:8/integer-little
-     , ?size_double:24/integer-little >>
-  , transfer_double(Double)
-  ];
 dt(string, String0) ->
   String = transfer_string(String0),
   Length = iolist_size(String),
@@ -266,37 +256,37 @@ dt(sexp,   {Type, Sexp0}) ->
   , Sexp
   ].
 
-xt(array_int,    Ints)       ->
+xt(xt_array_int,    Ints)       ->
   Payload = lists:map(fun transfer_int/1, Ints),
   [ xt_header(?xt_array_int, Payload)
   , Payload
   ];
-xt(array_double, Doubles)    ->
+xt(xt_array_double, Doubles)    ->
   Payload = lists:map(fun transfer_double/1, Doubles),
   [ xt_header(?xt_array_double, Payload)
   , Payload
   ];
-xt(array_string, Strings)    ->
+xt(xt_array_str,    Strings)    ->
   Payload = lists:map(fun transfer_string/1, Strings),
   [ xt_header(?xt_array_str, Payload)
   , Payload
   ];
-xt(list_tag,     TaggedList) ->
+xt(xt_list_tag,     TaggedList) ->
   Payload = lists:map(fun transfer_tagged/1, TaggedList),
   [ xt_header(?xt_list_tag, Payload)
   , Payload
   ];
-xt(symname,      Symbol)     ->
+xt(xt_symname,      Symbol)     ->
   Payload = transfer_string(Symbol),
   [ xt_header(?xt_symname, Payload)
   , Payload
   ];
-xt(vector,       Elements)   ->
+xt(xt_vector,       Elements)   ->
   Payload = lists:map(fun transfer_sexp/1, Elements),
   [ xt_header(?xt_vector, Payload)
   , Payload
   ];
-xt(dataframe,    DataFrame)  ->
+xt(dataframe,       DataFrame)  ->
   transfer_df(DataFrame).
 
 xt_header(Type, Payload) ->
@@ -331,17 +321,17 @@ transfer_df(DataFrame) ->
   Names    = df_names(DataFrame),
   RowNames = df_row_names(DataFrame),
   Values   = df_values(DataFrame),
-  AttrSexp = {list_tag, [ { {symname,      "names"}
-                          , {array_string, Names}
-                          }
-                        , { {symname,      "row.names"}
-                          , {array_int,    RowNames}
-                          }
-                        , { {symname,      "class"}
-                          , {array_string, ["data.frame"]}
-                          }
-                        ]},
-  transfer_sexp_with_attr(AttrSexp, {vector, Values}).
+  AttrSexp = {xt_list_tag, [ { {xt_symname,   "names"}
+                             , {xt_array_str, Names}
+                             }
+                           , { {xt_symname,   "row.names"}
+                             , {xt_array_int, RowNames}
+                             }
+                           , { {xt_symname,   "class"}
+                             , {xt_array_str, ["data.frame"]}
+                             }
+                           ]},
+  transfer_sexp_with_attr(AttrSexp, {xt_vector, Values}).
 
 transfer_sexp({Type, Data}) ->
   xt(Type, Data).

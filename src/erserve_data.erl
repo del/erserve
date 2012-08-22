@@ -54,14 +54,14 @@ by_cols({xt_has_attr, {{xt_list_tag, Tag}, {xt_vector, Data}}}) ->
 
 -spec class(erserve:tag()) -> erserve:r_class() | undefined.
 class(Tag) ->
-  case proplists:get_value({xt_str, "class"}, Tag) of
+  case proplists:get_value({xt_str, <<"class">>}, Tag) of
     {xt_array_str, [Class]} -> Class;
     undefined               -> undefined
   end.
 
 -spec names(erserve:tag()) -> [ string() ] | undefined.
 names(Tag) ->
-  case proplists:get_value({xt_str, "names"}, Tag) of
+  case proplists:get_value({xt_str, <<"names">>}, Tag) of
     {xt_array_str, Names} -> Names;
     undefined             -> undefined
   end.
@@ -69,8 +69,8 @@ names(Tag) ->
 -spec is_df(erserve:r_data()) -> boolean().
 is_df({{xt_list_tag, Tag}, {xt_vector, _Data}}) ->
   case class(Tag) of
-    "data.frame" -> true;
-    _            -> false
+    <<"data.frame">> -> true;
+    _                -> false
   end;
 is_df(_Rdata)                                   ->
   false.

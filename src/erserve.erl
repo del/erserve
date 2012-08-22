@@ -64,6 +64,7 @@
                          | xt_array_int
                          | xt_array_str
                          | xt_list_tag
+                         | xt_symname
                          | xt_vector
                          | dataframe
                          | list
@@ -73,7 +74,7 @@
                             , {xt_vector,   [ r_data() ]}
                             }
                           }.
--type   r_class()       :: string().
+-type   r_class()       :: binary().
 -type   untagged_data() :: float()
                          | integer()
                          | binary()
@@ -82,31 +83,16 @@
                          | [ binary() ]
                          | [ untagged_data() ]
                          | df().
--type   df()           :: [ { Name :: string(), r_data() } ].
+-type   df()           :: [ { Name :: string(), r_type(), r_data() } ].
 -type   error_code()   :: atom().
--type   type()         :: int
-                        | double
-                        | string
-                        | sexp
-                        | array_int
-                        | array_double
-                        | array_string
-                        | array_bool
-                        | list_tag
-                        | symname
-                        | vector
-                        | dataframe.
 
 -export_type([ connection/0
-             , column_name/0
              , error_code/0
              , r_class/0
              , r_data/0
-             , r_expression/0
              , r_df/0
              , r_expression/0
              , r_type/0
-             , type/0
              ]).
 
 
@@ -124,7 +110,7 @@ close(Conn) ->
 open() ->
   open(?default_host, ?default_port).
 
--spec open(Host :: string()) -> string().
+-spec open(Host :: string()) -> connection().
 open(Host) ->
   open(Host, ?default_port).
 
@@ -156,7 +142,7 @@ eval(Conn, Expr) ->
       {error, tcp, Error}
   end.
 
--spec eval_void(connection(), expression()) ->
+-spec eval_void(connection(), r_expression()) ->
                    ok | {error, error_code(), term()}.
 eval_void(Conn, Expr) ->
   case erserve_comms:send_message(Conn, eval_void, Expr) of
@@ -170,18 +156,18 @@ eval_void(Conn, Expr) ->
       {error, tcp, Error}
   end.
 
--spec set_variable(connection(), string() | atom(), type(), untagged_data()) ->
+-spec set_variable(connection(),
+                   string() | atom(),
+                   r_type(),
+                   untagged_data()) ->
                           {ok, r_data()} | {error, error_code(), term()}.
 set_variable(Conn, Name, Type,   Value) when is_atom(Name) ->
   set_variable(Conn, atom_to_list(Name), Type, Value);
-set_variable(Conn, Name, int,    Value)                    ->
-  set_variable(Conn, Name, array_int, [Value]);
-set_variable(Conn, Name, double, Value)                    ->
-  set_variable(Conn, Name, array_double, [Value]);
 set_variable(Conn, Name, Type, Value)                      ->
   case erserve_comms:send_message(Conn, {set_variable, Type}, {Name, Value}) of
     ok             ->
-      erserve_comms:receive_reply(Conn);
+      {ok, []} = erserve_comms:receive_reply(Conn),
+      ok;
     {error, Error} ->
       close(Conn),
       {error, tcp, Error}
