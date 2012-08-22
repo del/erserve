@@ -276,6 +276,11 @@ xt(xt_list_tag,     TaggedList) ->
   [ xt_header(?xt_list_tag, Payload)
   , Payload
   ];
+xt(xt_str,          String)     ->
+  Payload = transfer_string(String),
+  [ xt_header(?xt_symname, Payload)
+  , Payload
+  ];
 xt(xt_symname,      Symbol)     ->
   Payload = transfer_string(Symbol),
   [ xt_header(?xt_symname, Payload)
@@ -353,7 +358,8 @@ df_names(DataFrame) ->
   lists:map(fun({Name, _Type, _Values}) ->
                 case Name of
                   NAtom when is_atom(NAtom)  -> atom_to_list(NAtom);
-                  NStr  when is_binary(NStr) -> NStr
+                  NBin  when is_binary(NBin) -> NBin;
+                  NStr  when is_list(NStr)   -> NStr
                 end
             end, DataFrame).
 
