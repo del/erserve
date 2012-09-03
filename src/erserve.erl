@@ -159,8 +159,7 @@ eval_void(Conn, Expr) ->
 -spec set_variable(connection(),
                    string() | atom(),
                    r_type(),
-                   untagged_data()) ->
-                          {ok, r_data()} | {error, error_code(), term()}.
+                   untagged_data()) -> r_data() | {error, error_code(), term()}.
 set_variable(Conn, Name, Type,   Value) when is_atom(Name) ->
   set_variable(Conn, atom_to_list(Name), Type, Value);
 set_variable(Conn, Name, Type, Value)                      ->
