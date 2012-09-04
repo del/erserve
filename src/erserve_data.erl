@@ -1,12 +1,12 @@
-%%%-----------------------------------------------------------------------------
-%%% @doc This module handles detecting the types of R data received, and parsing
-%%%      it from the internal format to a more Erlang-style format, e.g. lists
-%%%      of integers, floats, strings, or proplists for representation of R's
-%%%      data frames and lists.
-%%%
-%%% @author Daniel Eliasson <daniel@danieleliasson.com>
-%%% @copyright 2012 Daniel Eliasson; Apache 2.0 license -- see LICENSE file
-%%% @end------------------------------------------------------------------------
+%%------------------------------------------------------------------------------
+%% @doc This module handles detecting the types of R data received, and parsing
+%%      it from the internal format to a more Erlang-style format, e.g. lists
+%%      of integers, floats, strings, or proplists for representation of R's
+%%      data frames and lists.
+%%
+%% @author Daniel Eliasson <daniel@danieleliasson.com>
+%% @copyright 2012 Daniel Eliasson; Apache 2.0 license -- see LICENSE file
+%% @end-------------------------------------------------------------------------
 -module(erserve_data).
 
 
@@ -17,6 +17,7 @@
 
 
 %%%_* External API -------------------------------------------------------------
+
 -spec type(erserve:r_data()) -> erserve:r_type().
 type({xt_has_attr, Data}) ->
   case {is_df(Data), is_r_list(Data)} of
@@ -45,6 +46,7 @@ parse({_Type,       Data})          ->
 
 
 %%%_* Internal functions -------------------------------------------------------
+
 -spec by_cols(erserve:r_df()) -> erserve:df().
 by_cols({xt_has_attr, {{xt_list_tag, Tag}, {xt_vector, Data}}}) ->
   NamedCols = lists:zip(names(Tag), Data),

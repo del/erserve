@@ -1,15 +1,15 @@
-%%%-----------------------------------------------------------------------------
-%%% @doc erserve allows Erlang code to call R code via Rserve. The basic usage
-%%%      is to open a connection and send one or more commands to it, then use
-%%%      the type/1 and parse/1 functions to transfer the data from internal
-%%%      representation to "Erlangy" formats.
-%%%
-%%% @reference For more information, see <a href="http://r-project.org">R</a>
-%%%            and <a href="http://rforge.net/Rserve/">Rserve</a>.
-%%%
-%%% @author Daniel Eliasson <daniel@danieleliasson.com>
-%%% @copyright 2012 Daniel Eliasson; Apache 2.0 license -- see LICENSE file
-%%% @end------------------------------------------------------------------------
+%%------------------------------------------------------------------------------
+%% @doc erserve allows Erlang code to call R code via Rserve. The basic usage
+%%      is to open a connection and send one or more commands to it, then use
+%%      the type/1 and parse/1 functions to transfer the data from internal
+%%      representation to "Erlangy" formats.
+%%
+%% @reference For more information, see <a href="http://r-project.org">R</a>
+%%            and <a href="http://rforge.net/Rserve/">Rserve</a>.
+%%
+%% @author Daniel Eliasson <daniel@danieleliasson.com>
+%% @copyright 2012 Daniel Eliasson; Apache 2.0 license -- see LICENSE file
+%% @end-------------------------------------------------------------------------
 -module(erserve).
 
 -behaviour(application).
@@ -102,6 +102,7 @@
 
 
 %%%_* Connection handling ------------------------------------------------------
+
 -spec close(connection()) -> ok.
 close(Conn) ->
   gen_tcp:close(Conn).
@@ -131,6 +132,7 @@ open(Host, Port) ->
 
 
 %%%_* R commands ---------------------------------------------------------------
+
 -spec eval(connection(), r_expression()) ->
               {ok, r_data()} | {error, error_code(), term()}.
 eval(Conn, Expr) ->
@@ -174,6 +176,7 @@ set_variable(Conn, Name, Type, Value)                      ->
 
 
 %%%_* Data parsing -------------------------------------------------------------
+
 -spec type(r_data()) -> r_type().
 type(Rdata) ->
   erserve_data:type(Rdata).
@@ -184,6 +187,7 @@ parse(Rdata) ->
 
 
 %%%_* application callbacks ----------------------------------------------------
+
 -spec start(term(), term()) -> {ok, pid()} | {error, term()}.
 start(_StartType, _Args) ->
   supervisor:start_link({local, ?MODULE}, ?MODULE, []).
@@ -194,6 +198,7 @@ stop(_State) ->
 
 
 %%%_* supervisor callbacks -----------------------------------------------------
+
 -spec init([]) -> term().
 init([]) ->
   { ok
