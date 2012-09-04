@@ -1,11 +1,11 @@
-%%%-----------------------------------------------------------------------------
-%%% @doc This module handles the binary protocol communication with an Rserve
-%%%      server, sending and receiving messages, and parsing them to an internal
-%%%      format. Unimplemented data types are received simply as a binary blob.
-%%%
-%%% @author Daniel Eliasson <daniel@danieleliasson.com>
-%%% @copyright 2012 Daniel Eliasson; Apache 2.0 license -- see LICENSE file
-%%% @end------------------------------------------------------------------------
+%%------------------------------------------------------------------------------
+%% @doc This module handles the binary protocol communication with an Rserve
+%%      server, sending and receiving messages, and parsing them to an internal
+%%      format. Unimplemented data types are received simply as a binary blob.
+%%
+%% @author Daniel Eliasson <daniel@danieleliasson.com>
+%% @copyright 2012 Daniel Eliasson; Apache 2.0 license -- see LICENSE file
+%% @end-------------------------------------------------------------------------
 -module(erserve_comms).
 
 
@@ -17,10 +17,11 @@
 
 
 %%%_* Includes -----------------------------------------------------------------
--include_lib("src/erserve.hrl").
+-include_lib("erserve.hrl").
 
 
 %%%_* External API -------------------------------------------------------------
+
 -spec receive_connection_ack(erserve:connection()) -> ok.
 receive_connection_ack(Conn) ->
   {ok, Msg} = gen_tcp:recv(Conn, 32),
@@ -45,7 +46,8 @@ send_message(Conn, Type, Data) ->
   gen_tcp:send(Conn, Message).
 
 
-%%%_* Data receiving functions -------------------------------------------------
+%%%_* Rserve reply receiving functions -----------------------------------------
+
 receive_reply_1(Conn) ->
   {ok, Msg} = gen_tcp:recv(Conn, 12),
   << Len0:32/integer-little
@@ -60,6 +62,9 @@ receive_reply_error(Conn, AckCode) ->
   Error                = error_from_code(ErrCode),
   {ok, Rest}           = gen_tcp:recv(Conn, 0),
   {error, Error, Rest}.
+
+
+%%%_* Data receiving functions -------------------------------------------------
 
 receive_data(Conn, Length) ->
   case lists:reverse(receive_data(Conn, Length, [])) of
@@ -134,9 +139,7 @@ receive_sexp( Conn, UnimplType,       Length)                          ->
   receive_unimplemented_type(Conn, UnimplType, Length).
 
 
-receive_closure(Conn, Length) ->
-  {ok, Closure} = gen_tcp:recv(Conn, Length),
-  {closure, Closure}.
+%%%_* Numeric data receiving functions -----------------------------------------
 
 receive_int_array(_Conn, 0,      Acc) ->
   {xt_array_int, lists:reverse(Acc)};
@@ -160,19 +163,41 @@ receive_double_array( Conn, Length, Acc) ->
   receive_double_array(Conn, RemainingLength, NewAcc).
 
 receive_double(Conn) ->
-  {ok, Data}                 = gen_tcp:recv(Conn, 8),
-  <<Double:64/float-little>> = Data,
-  Double.
+  {ok, Data} = gen_tcp:recv(Conn, 8),
+  case Data of
+    <<162, 7, 0, 0, 0, 0, 240, 127>> -> null;  % this value is an NA
+    <<Double:64/float-little>>       -> Double
+  end.
+
+
+%%%_* String receiving functions -----------------------------------------------
 
 receive_string_array(Conn, Length) ->
   {ok, Data} = gen_tcp:recv(Conn, Length),
-  %% Strip off '\01'-padding, split on null terminators, strip more padding
-  String     = string:strip(binary_to_list(Data), right, 1),
-  Strings0   = string:tokens(String, [0]),
-  Strings    = lists:map(fun(Str) ->
-                             list_to_binary(string:strip(Str, left, 1))
-                         end, Strings0),
+  Strings0 = trim_padding_and_split_array_str(Data),
+  Strings  = lists:map(fun trim_padding_and_parse_string/1, Strings0),
   {xt_array_str, Strings}.
+
+%%------------------------------------------------------------------------------
+%% @doc Strip off '\01'-padding, split on null terminators.
+%% @private
+%% @end-------------------------------------------------------------------------
+trim_padding_and_split_array_str(Bin) when is_binary(Bin) ->
+  String = string:strip(binary_to_list(Bin), right, 1),
+  string:tokens(String, [0]).
+
+%%------------------------------------------------------------------------------
+%% @doc Strip off '\01'-padding, convert to binary, or null if <<255>>.
+%% @private
+%% @end-------------------------------------------------------------------------
+trim_padding_and_parse_string(Str) when is_list(Str) ->
+  case list_to_binary(string:strip(Str, left, 1)) of
+    <<255>> -> null;
+    Bin     -> Bin
+  end.
+
+
+%%%_* Boolean receiving functions ----------------------------------------------
 
 receive_bool_array(Conn, Length) ->
   {ok, Data0} = gen_tcp:recv(Conn, Length),
@@ -192,6 +217,9 @@ receive_bool_array(Conn, Length) ->
                         end, binary_to_list(Bools)),
   {xt_array_bool, BoolArray}.
 
+
+%%%_* Vector and list receiving functions --------------------------------------
+
 receive_tagged_list(_Conn, 0,      Acc) ->
   {xt_list_tag, lists:reverse(Acc)};
 receive_tagged_list( Conn, Length, Acc) ->
@@ -210,11 +238,19 @@ receive_vector( Conn, Length, Acc) ->
   RemainingLength = Length - UsedLength,
   receive_vector(Conn, RemainingLength, NewAcc).
 
+
+%%%_* Other data receiving functions -------------------------------------------
+
+receive_closure(Conn, Length) ->
+  {ok, Closure} = gen_tcp:recv(Conn, Length),
+  {closure, Closure}.
+
 receive_unimplemented_type(Conn, Type, Length) ->
   {{unimplemented_type, Type}, gen_tcp:recv(Conn, Length)}.
 
 
 %%%_* Data sending functions ---------------------------------------------------
+
 message(eval,      String) ->
   Body   = dt(string, String),
   Length = iolist_size(Body),
@@ -356,6 +392,7 @@ transfer_sexp_with_attr(AttrSexp, Sexp) ->
 
 
 %%%_* Helpers for sending lists and data frames --------------------------------
+
 df_names(DataFrame) ->
   lists:map(fun({Name, _Type, _Values}) ->
                 case Name of
@@ -377,6 +414,7 @@ df_row_names(DataFrame) ->
 
 
 %%%_* Error handling -----------------------------------------------------------
+
 error_from_code(?err_auth_failed)     ->
   auth_failed;
 error_from_code(?err_conn_broken)     ->
