@@ -183,7 +183,9 @@ receive_bool_array(Conn, Length) ->
   << Bools:NBoolBits/bitstring
    , _Padding/binary
   >>    = Data,
-  BoolArray = lists:map(fun(1) ->
+  BoolArray = lists:map(fun(2) ->
+                            null;
+                           (1) ->
                             true;
                            (0) ->
                             false
