@@ -119,6 +119,9 @@ xt_array_str           = erserve:type(Rdata),
 
 Note that erserve outputs all strings in binary format.
 
+Note that R allows NA values in all forms of arrays. These become the atom 'null' in the data
+returned by erserve:parse/1. E.g. the R list `c(1.0, NA, 2.0)` becomes `[1.0, null, 2.0]`.
+
 At the moment, uploading of variables supports the simple R types `xt_str`, `xt_array_double`,
 `xt_array_int` and `xt_array_str`. On top of this, it also supports the more advanced formats
 `xt_vector` and `dataframe`.
