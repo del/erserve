@@ -143,6 +143,17 @@ ok = erserve:set_variable(Conn, "some.var", dataframe,       [ {"Letters", xt_ar
 ```
 
 
+## Implementation details of interest
+
+The communication with Rserve is done using gen_tcp, and messages are read from Rserve into
+memory. This means that some caution is needed to avoid calling R code that will return very large
+data sets.
+
+String arrays are returned as arrays of binary strings. However, there is conversion over lists
+internally, so the individual strings do not reference the original binary containing the whole
+string array.
+
+
 ## Acknowledgements
 
 Thanks to my employer, [Klarna](http://klarna.com/) for allowing me to contribute to open source
