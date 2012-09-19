@@ -70,13 +70,13 @@ erserve:parse(Rdata). % [1.0,2.0,3.0]
 An erserve connection is opened using one of functions `open/0`, `open/1` or `open/2`, where the
 arguments, if given, are hostname and port:
 ```erlang
-Conn1 = open(),                 %% open("localhost", 6311)
-Conn2 = open("somehost"),       %% open("somehost",  6311)
-Conn3 = open("somehost", 1163).
+Conn1 = erserve:open(),                 %% erserve:open("localhost", 6311)
+Conn2 = erserve:open("somehost"),       %% erserve:open("somehost",  6311)
+Conn3 = erserve:open("somehost", 1163).
 ```
 To close a connection, simply send it to `close/1`:
 ```erlang
-ok = close(Conn).
+ok = erserve:close(Conn).
 ```
 
 If you are in need of connection pooling, take a look at
