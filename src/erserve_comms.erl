@@ -305,7 +305,7 @@ xt(xt_array_double, Doubles)    ->
   , Payload
   ];
 xt(xt_array_str,    Strings)    ->
-  Payload = lists:map(fun transfer_string/1, Strings),
+  Payload = transfer_string_array(Strings),
   [ xt_header(?xt_array_str, Payload)
   , Payload
   ];
@@ -339,14 +339,21 @@ xt_header(Type, Payload) ->
   >>.
 
 
-%% Strings are transferred with a '\00' terminator and padded out
-%% with '\01' to become of a byte length that's divisible by 4.
+%% Strings are transferred with a '\00' terminator and string arrays
+%% are padded out with '\01' to become of a byte length that's divisible
+%% by 4.
+transfer_string_array(Strings) ->
+  Payload = lists:map(fun transfer_string/1, Strings),
+  pad_string_array(Payload).
+
 transfer_string(String0) ->
-  String  = [String0, <<0>>],
-  Length0 = iolist_size(String),
-  case (Length0 rem 4) of
-    0 -> String;
-    N -> [String, binary:copy(<<1>>, 4 - N)]
+  [String0, <<0>>].
+
+pad_string_array(Payload) ->
+  Length = iolist_size(Payload),
+  case (Length rem 4) of
+    0 -> Payload;
+    N -> [Payload, binary:copy(<<1>>, 4 - N)]
   end.
 
 transfer_int(Int) ->
