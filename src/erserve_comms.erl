@@ -151,8 +151,11 @@ receive_int_array( Conn, Length, Acc) ->
 
 receive_int(Conn) ->
   {ok, Data}                       = gen_tcp:recv(Conn, 4),
-  <<Int:32/integer-signed-little>> = Data,
-  Int.
+  <<Int0:32/integer-signed-little>> = Data,
+  case Int0 of
+    ?na_int -> null;
+    Int     -> Int
+  end.
 
 receive_double_array(_Conn, 0,      Acc) ->
   {xt_array_double, lists:reverse(Acc)};
@@ -165,8 +168,8 @@ receive_double_array( Conn, Length, Acc) ->
 receive_double(Conn) ->
   {ok, Data} = gen_tcp:recv(Conn, 8),
   case Data of
-    <<162, 7, 0, 0, 0, 0, 240, 127>> -> null;  % this value is an NA
-    <<Double:64/float-little>>       -> Double
+    ?na_double_binary          -> null;
+    <<Double:64/float-little>> -> Double
   end.
 
 
@@ -192,8 +195,8 @@ trim_padding_and_split_array_str(Bin) when is_binary(Bin) ->
 %% @end-------------------------------------------------------------------------
 trim_padding_and_parse_string(Str) when is_list(Str) ->
   case list_to_binary(string:strip(Str, left, 1)) of
-    <<255>> -> null;
-    Bin     -> Bin
+    <<?na_string>> -> null;
+    Bin            -> Bin
   end.
 
 
@@ -208,11 +211,13 @@ receive_bool_array(Conn, Length) ->
   << Bools:NBoolBits/bitstring
    , _Padding/binary
   >>    = Data,
-  BoolArray = lists:map(fun(2) ->
+  BoolArray = lists:map(fun(?na_boolean)     ->
                             null;
-                           (1) ->
+                           (?na_boolean_alt) ->
+                            null;
+                           (1)               ->
                             true;
-                           (0) ->
+                           (0)               ->
                             false
                         end, binary_to_list(Bools)),
   {xt_array_bool, BoolArray}.
@@ -356,11 +361,14 @@ transfer_string(String0) ->
 
 transfer_boolean_array(Booleans) ->
   N       = length(Booleans),
-  Data    = lists:map(fun(null)  -> <<2:(?size_bool * 8)/integer-little>>;
-                         (true)  -> <<1:(?size_bool * 8)/integer-little>>;
-                         (false) -> <<0:(?size_bool * 8)/integer-little>>
+  Data    = lists:map(fun(null)  ->
+                          <<?na_boolean:(?size_bool * 8)>>;
+                         (true)  ->
+                          <<1:(?size_bool * 8)>>;
+                         (false) ->
+                          <<0:(?size_bool * 8)>>
                       end, Booleans),
-  Payload = [<< N:32/integer-little>>, Data],
+  Payload = [<<N:32/integer-little>>, Data],
   pad_array(Payload).
 
 pad_array(Payload) ->
@@ -370,9 +378,13 @@ pad_array(Payload) ->
     N -> [Payload, binary:copy(<<1>>, 4 - N)]
   end.
 
-transfer_int(Int) ->
+transfer_int(null) ->
+  <<?na_int:(?size_int * 8)/integer-signed-little>>;
+transfer_int(Int)  ->
   <<Int:(?size_int * 8)/integer-signed-little>>.
 
+transfer_double(null)   ->
+  ?na_double_binary;
 transfer_double(Double) ->
   <<Double:(?size_double * 8)/float-little>>.
 

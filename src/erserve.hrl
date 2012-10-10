@@ -57,3 +57,11 @@
 -define(size_double,          8).
 -define(size_char,            1).
 -define(size_bool,            1).
+
+%% Missing values markers
+-define(na_boolean,           255).
+-define(na_boolean_alt,       2).
+-define(na_double,            16#7ff00000000007a2).
+-define(na_double_binary,     <<162,7,0,0,0,0,240,127>>).
+-define(na_int,               -2147483648).
+-define(na_string,            255).
