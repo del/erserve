@@ -294,14 +294,19 @@ dt(sexp,   {Type, Sexp0}) ->
   , Sexp
   ].
 
-xt(xt_array_int,    Ints)       ->
-  Payload = lists:map(fun transfer_int/1, Ints),
-  [ xt_header(?xt_array_int, Payload)
+xt(xt_array_bool, Booleans)     ->
+  Payload = transfer_boolean_array(Booleans),
+  [ xt_header(?xt_array_bool, Payload)
   , Payload
   ];
 xt(xt_array_double, Doubles)    ->
   Payload = lists:map(fun transfer_double/1, Doubles),
   [ xt_header(?xt_array_double, Payload)
+  , Payload
+  ];
+xt(xt_array_int,    Ints)       ->
+  Payload = lists:map(fun transfer_int/1, Ints),
+  [ xt_header(?xt_array_int, Payload)
   , Payload
   ];
 xt(xt_array_str,    Strings)    ->
@@ -344,12 +349,21 @@ xt_header(Type, Payload) ->
 %% by 4.
 transfer_string_array(Strings) ->
   Payload = lists:map(fun transfer_string/1, Strings),
-  pad_string_array(Payload).
+  pad_array(Payload).
 
 transfer_string(String0) ->
   [String0, <<0>>].
 
-pad_string_array(Payload) ->
+transfer_boolean_array(Booleans) ->
+  N       = length(Booleans),
+  Data    = lists:map(fun(null)  -> <<2:(?size_bool * 8)/integer-little>>;
+                         (true)  -> <<1:(?size_bool * 8)/integer-little>>;
+                         (false) -> <<0:(?size_bool * 8)/integer-little>>
+                      end, Booleans),
+  Payload = [<< N:32/integer-little>>, Data],
+  pad_array(Payload).
+
+pad_array(Payload) ->
   Length = iolist_size(Payload),
   case (Length rem 4) of
     0 -> Payload;
