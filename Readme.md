@@ -119,8 +119,14 @@ xt_array_str           = erserve:type(Rdata),
 
 Note that erserve outputs all strings in binary format.
 
-Note that R allows NA values in all forms of arrays. These become the atom 'null' in the data
+Note that R allows NA values in all forms of arrays. These become the atom `null` in the data
 returned by erserve:parse/1. E.g. the R list `c(1.0, NA, 2.0)` becomes `[1.0, null, 2.0]`.
+Conversely, you can upload an NA by inserting the atom `null` into the data you send.
+
+Uploading NAs is supported in int and double arrays, as well as booleans, but for the latter,
+there is an issue: if such a boolean array is stored using R's save() function, and then read
+up in a regular R instance using load(), the NA values will be interpreted as TRUE. It's not
+clear exactly what the issue is, but it might have to do with Rserve itself.
 
 At the moment, uploading of variables supports the simple R types `xt_str`, `xt_array_double`,
 `xt_array_int` and `xt_array_str`. On top of this, it also supports the more advanced formats
