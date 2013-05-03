@@ -175,6 +175,8 @@ receive_double(Conn) ->
 
 %%%_* String receiving functions -----------------------------------------------
 
+receive_string_array(_Conn, 0)     ->
+  {xt_array_str, []};
 receive_string_array(Conn, Length) ->
   {ok, Data} = gen_tcp:recv(Conn, Length),
   Strings0 = trim_padding_and_split_array_str(Data),
