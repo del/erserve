@@ -32,8 +32,11 @@
         ]).
 
 %% Data parsing
--export([ type/1
+-export([ dataframe_to_proplist/1
         , parse/1
+        , proplist_to_dataframe/1
+        , to_r_value/1
+        , type/1
         ]).
 
 %% application callbacks
@@ -185,6 +188,26 @@ type(Rdata) ->
 parse(Rdata) ->
   erserve_data:parse(Rdata).
 
+%% @doc Convert an Erlang proplist to an R dataframe representation. This will
+%%      only work if every key in the property list has either a scalar value,
+%%      or a list of the same length.
+-spec proplist_to_dataframe([proplist:property()]) -> erserve:r_df().
+proplist_to_dataframe(Plist) -> erserve_data:proplist_to_dataframe(Plist).
+
+%% @doc Convert an R dataframe to an Erlang proplist. This is a simple helper
+%%      that runs erserve:parse/1 and performs these transformations:
+%%        - convert binary strings to lists
+%%        - convert single-value lists to scalars (e.g. [123] -> 123)
+-spec dataframe_to_proplist(erserve:r_df()) -> [proplist:property()].
+dataframe_to_proplist(Df) -> erserve_data:dataframe_to_proplist(Df).
+
+%% @doc Convert a simple Erlang value to an R representation.
+-spec to_r_value( integer()
+                | [ integer() ]
+                | float()
+                | [ float() ]
+                | [ string() ] ) -> [ r_data() ].
+to_r_value(ErlangValue) -> erserve_data:to_r_value(ErlangValue).
 
 %%%_* application callbacks ----------------------------------------------------
 
