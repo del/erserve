@@ -65,3 +65,11 @@
 -define(na_double_binary,     <<162,7,0,0,0,0,240,127>>).
 -define(na_int,               -2147483648).
 -define(na_string,            255).
+
+%% Other non-number markers
+-define(nan_double,            16#fff8000000000000).
+-define(nan_double_binary,     <<0,0,0,0,0,0,248,255>>).
+-define(inf_pos_double,        16#7ff0000000000000).
+-define(inf_pos_double_binary, <<0,0,0,0,0,0,240,127>>).
+-define(inf_neg_double,        16#fff0000000000000).
+-define(inf_neg_double_binary, <<0,0,0,0,0,0,240,255>>).

@@ -169,6 +169,9 @@ receive_double(Conn) ->
   {ok, Data} = gen_tcp:recv(Conn, 8),
   case Data of
     ?na_double_binary          -> null;
+    ?nan_double_binary         -> nan;
+    ?inf_pos_double_binary     -> inf;
+    ?inf_neg_double_binary     -> '-inf';
     <<Double:64/float-little>> -> Double
   end.
 
