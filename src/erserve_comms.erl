@@ -166,14 +166,36 @@ receive_double_array( Conn, Length, Acc) ->
   receive_double_array(Conn, RemainingLength, NewAcc).
 
 receive_double(Conn) ->
-  {ok, Data} = gen_tcp:recv(Conn, 8),
-  case Data of
-    ?na_double_binary          -> null;
-    ?nan_double_binary         -> nan;
-    ?inf_pos_double_binary     -> inf;
-    ?inf_neg_double_binary     -> '-inf';
-    <<Double:64/float-little>> -> Double
+  {ok, Data0}         = gen_tcp:recv(Conn, 8),
+  Data                = change_double_endianness(Data0),
+  <<S:1, E:11, M:52>> = Data,
+  case E of
+    ?nan_double_exp -> receive_nan_double(S, M);
+    _               -> receive_real_double(Data)
   end.
+
+-spec receive_nan_double(0 | 1, Mantissa :: 0)         -> inf | '-inf';
+                        (0 | 1, Mantissa :: 16#7a2)    -> null;
+                        (0 | 1, Mantissa :: integer()) -> nan.
+receive_nan_double(S, M) ->
+  case M of
+    ?nan_double_inf_mantissa -> receive_inf_double(S);
+    ?nan_double_na_mantissa  -> null;
+    _                        -> nan
+  end.
+
+-spec receive_inf_double(SignBit :: 0) -> inf;
+                        (SignBit :: 1) -> '-inf'.
+receive_inf_double(1) -> '-inf';
+receive_inf_double(0) -> inf.
+
+-spec receive_real_double(binary()) -> float().
+receive_real_double(Data) ->
+  <<Double:64/float>> = Data,
+  Double.
+
+change_double_endianness(<<B8, B7, B6, B5, B4, B3, B2, B1>>) ->
+  <<B1, B2, B3, B4, B5, B6, B7, B8>>.
 
 
 %%%_* String receiving functions -----------------------------------------------
@@ -389,7 +411,7 @@ transfer_int(Int)  ->
   <<Int:(?size_int * 8)/integer-signed-little>>.
 
 transfer_double(null)   ->
-  ?na_double_binary;
+  ?nan_double_na_binary;
 transfer_double(Double) ->
   <<Double:(?size_double * 8)/float-little>>.
 

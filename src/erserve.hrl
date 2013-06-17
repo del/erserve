@@ -61,15 +61,11 @@
 %% Missing values markers
 -define(na_boolean,           255).
 -define(na_boolean_alt,       2).
--define(na_double,            16#7ff00000000007a2).
--define(na_double_binary,     <<162,7,0,0,0,0,240,127>>).
 -define(na_int,               -2147483648).
 -define(na_string,            255).
 
-%% Other non-number markers
--define(nan_double,            16#fff8000000000000).
--define(nan_double_binary,     <<0,0,0,0,0,0,248,255>>).
--define(inf_pos_double,        16#7ff0000000000000).
--define(inf_pos_double_binary, <<0,0,0,0,0,0,240,127>>).
--define(inf_neg_double,        16#fff0000000000000).
--define(inf_neg_double_binary, <<0,0,0,0,0,0,240,255>>).
+%% NaN markers for doubles
+-define(nan_double_exp,          16#7ff).
+-define(nan_double_inf_mantissa, 16#0).
+-define(nan_double_na_mantissa,  16#7a2).
+-define(nan_double_na_binary,    <<162,7,0,0,0,0,240,127>>).
