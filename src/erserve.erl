@@ -165,7 +165,7 @@ eval_void(Conn, Expr) ->
                    string() | atom(),
                    r_type(),
                    untagged_data()) -> r_data() | {error, error_code(), term()}.
-set_variable(Conn, Name, Type,   Value) when is_atom(Name) ->
+set_variable(Conn, Name, Type, Value) when is_atom(Name) ->
   set_variable(Conn, atom_to_list(Name), Type, Value);
 set_variable(Conn, Name, Type, Value)                      ->
   case erserve_comms:send_message(Conn, {set_variable, Type}, {Name, Value}) of
