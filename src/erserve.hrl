@@ -69,3 +69,9 @@
 -define(nan_double_inf_mantissa, 16#0).
 -define(nan_double_na_mantissa,  16#7a2).
 -define(nan_double_na_binary,    <<162,7,0,0,0,0,240,127>>).
+
+%% Cutoffs for representing integers
+-define(max_int,         2147483647).
+-define(min_int,        -2147483648).
+-define(max_double_int,  9007199254740992).
+-define(min_double_int, -9007199254740992).

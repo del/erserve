@@ -150,7 +150,7 @@ receive_int_array( Conn, Length, Acc) ->
   receive_int_array(Conn, RemainingLength, NewAcc).
 
 receive_int(Conn) ->
-  {ok, Data}                       = gen_tcp:recv(Conn, 4),
+  {ok, Data}                        = gen_tcp:recv(Conn, 4),
   <<Int0:32/integer-signed-little>> = Data,
   case Int0 of
     ?na_int -> null;
@@ -337,8 +337,8 @@ xt(xt_array_double, Doubles)    ->
   , Payload
   ];
 xt(xt_array_int,    Ints)       ->
-  Payload = lists:map(fun transfer_int/1, Ints),
-  [ xt_header(?xt_array_int, Payload)
+  {Type, Payload} = transfer_ints(Ints),
+  [ xt_header(Type, Payload)
   , Payload
   ];
 xt(xt_array_str,    Strings)    ->
@@ -404,6 +404,66 @@ pad_array(Payload) ->
     0 -> Payload;
     N -> [Payload, binary:copy(<<1>>, 4 - N)]
   end.
+
+%% Ints are special, since Erlang can handle arbitrary sized integers,
+%% but R uses 32-bit ints. Therefore, we need to see if we can send the
+%% integers as ints. If not, we try doubles. If that also fails, we
+%% resort to string representation.
+-spec transfer_ints([null | integer()]) ->
+                       { ?xt_array_int,    [ null | integer() ] }
+                     | { ?xt_array_double, [ null | float() ] }
+                     | { ?xt_array_str,    [ null | string() ] }.
+transfer_ints(Ints) ->
+  Type    = r_type_for_int_array(Ints),
+  Payload = case Type of
+              ?xt_array_int    ->
+                lists:map(fun transfer_int/1, Ints);
+              ?xt_array_double ->
+                IntsAsDoubles = lists:map(fun int_to_double/1, Ints),
+                lists:map(fun transfer_double/1, IntsAsDoubles);
+              ?xt_array_str    ->
+                IntsAsStrings = lists:map(fun int_to_string/1, Ints),
+                transfer_string_array(IntsAsStrings)
+            end,
+  {Type, Payload}.
+
+-spec r_type_for_int_array([null | integer()]) -> ?xt_array_int
+                                                | ?xt_array_double
+                                                | ?xt_array_str.
+r_type_for_int_array(Ints) ->
+  lists:foldl(fun(Int, Type) ->
+                  case {r_type_for_int(Int), Type} of
+                    {?xt_array_int,    ?xt_array_int}    -> ?xt_array_int;
+                    {?xt_array_int,    ?xt_array_double} -> ?xt_array_double;
+                    {?xt_array_int,    ?xt_array_str}    -> ?xt_array_str;
+                    {?xt_array_double, ?xt_array_int}    -> ?xt_array_double;
+                    {?xt_array_double, ?xt_array_double} -> ?xt_array_double;
+                    {?xt_array_double, ?xt_array_str}    -> ?xt_array_str;
+                    {?xt_array_str,    _AnyType}         -> ?xt_array_str
+                  end
+              end, ?xt_array_int, Ints).
+
+-spec r_type_for_int(null | integer()) -> ?xt_array_int
+                                        | ?xt_array_double
+                                        | ?xt_array_str.
+r_type_for_int(null)                     -> ?xt_array_int;
+r_type_for_int(Int) when is_integer(Int) ->
+  if
+    Int >= ?min_int andalso Int =< ?max_int       -> ?xt_array_int;
+    Int >= ?min_double_int andalso Int < ?min_int -> ?xt_array_double;
+    Int >= ?max_int andalso Int < ?max_double_int -> ?xt_array_double;
+    true                                          -> ?xt_array_str
+  end.
+
+-spec int_to_double(null)      -> null;
+                   (integer()) -> float().
+int_to_double(null)                     -> null;
+int_to_double(Int) when is_integer(Int) -> float(Int).
+
+-spec int_to_string(null | integer()) -> string().
+int_to_string(null)                     -> "NA";
+int_to_string(Int) when is_integer(Int) -> integer_to_list(Int).
+
 
 transfer_int(null) ->
   <<?na_int:(?size_int * 8)/integer-signed-little>>;
