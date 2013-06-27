@@ -20,6 +20,7 @@
 
 %% Connection handling
 -export([ close/1
+        , controlling_process/2
         , open/0
         , open/1
         , open/2
@@ -132,6 +133,13 @@ open(Host, Port) ->
       close(Conn),
       throw(invalid_ack)
   end.
+
+%% @doc Change the controlling process of a connection. This needs to be
+%%      performed if the process which opened the connection is handing over
+%%      ownership to another process. See gen_tcp:controlling_process/2.
+-spec controlling_process(connection(), pid()) -> ok | {error, term()}.
+controlling_process(Conn, Pid) ->
+  gen_tcp:controlling_process(Conn, Pid).
 
 
 %%%_* R commands ---------------------------------------------------------------
